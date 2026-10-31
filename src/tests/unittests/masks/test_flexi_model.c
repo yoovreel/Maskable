@@ -131,7 +131,7 @@ static void test_drop_element_into_other_group(void **state)
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4}}");
 
   // drop 1 onto 3, landing above it
-  assert_true(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, TRUE));
+  assert_true(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, TRUE));
   assert_layout("u{2,i{3,1,4}}");
 }
 
@@ -139,7 +139,7 @@ static void test_drop_element_below_target(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4}}");
 
-  assert_true(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, FALSE));
+  assert_true(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, FALSE));
   assert_layout("u{2,i{1,3,4}}");
 }
 
@@ -148,7 +148,7 @@ static void test_drop_adopts_target_operator(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,d{3}}");
 
-  assert_true(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, TRUE));
+  assert_true(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, TRUE));
   assert_layout("u{2,d{3,1}}");
 }
 
@@ -157,12 +157,12 @@ static void test_drop_adopts_target_operator(void **state)
 static void test_drop_between_groups_never_creates_a_third(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4}}");
-  dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, TRUE);
+  dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, TRUE);
   assert_layout("u{2,i{3,1,4}}");
   flexi_teardown();
 
   grp = flexi_build("u{1,2,i{3,4}}");
-  dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, FALSE);
+  dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, FALSE);
   assert_layout("u{2,i{1,3,4}}");
 }
 
@@ -171,7 +171,7 @@ static void test_drop_between_same_op_groups_keeps_both(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,u{3,4}}");
 
-  dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, TRUE);
+  dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, TRUE);
   assert_layout("u{2,u{3,1,4}}");
 }
 
@@ -180,7 +180,7 @@ static void test_drop_onto_bottom_group(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4}}");
 
-  dt_masks_model_drop_element_onto_element(&flexi_module, grp, 3, 1, FALSE);
+  dt_masks_model_drop_member_onto_member(&flexi_module, grp, 3, 1, FALSE);
   assert_layout("u{3,1,2,i{4}}");
 }
 
@@ -189,7 +189,7 @@ static void test_drop_onto_bottom_group(void **state)
 static void test_drop_emptying_group_keeps_it(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{u{1},i{2,3}}");
-  dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 2, TRUE);
+  dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 2, TRUE);
   assert_layout("u{u{},i{2,1,3}}");
 }
 
@@ -349,7 +349,7 @@ static void test_drop_onto_self_is_rejected(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3}}");
 
-  assert_false(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 2, 2, TRUE));
+  assert_false(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 2, 2, TRUE));
   assert_layout("u{1,2,i{3}}");
 }
 
@@ -357,7 +357,7 @@ static void test_drop_of_unknown_element_is_rejected(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2}");
 
-  assert_false(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 77, 1, TRUE));
+  assert_false(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 77, 1, TRUE));
   assert_layout("u{1,2}");
 }
 
@@ -371,7 +371,7 @@ static void test_drop_keeps_element_selected_in_new_group(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4}}");
 
-  dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 3, TRUE);
+  dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 3, TRUE);
   assert_int_equal(flexi_bd.panel_selected_formid, 1);
   assert_int_equal(flexi_bd.panel_selected_group_cid, dt_masks_gui_group_cid_of_form(grp, 1));
   assert_int_equal(flexi_bd.panel_selected_group_cid, FLEXI_GID(1));
@@ -441,24 +441,12 @@ static void test_click_element_selects_element_and_its_group(void **state)
   assert_int_equal(flexi_bd.panel_selected_group_cid, FLEXI_GID(1));
 }
 
-// deselecting an element leaves its GROUP selected, so getting back to the
-// group is not a second click
-static void test_click_selected_element_falls_back_to_its_group(void **state)
+// deselecting an element selects the whole mask, not its group
+static void test_click_selected_element_falls_back_to_the_whole_mask(void **state)
 {
   flexi_build("u{1,2,i{3,4}}");
   _click_element(4);
   _click_element(4);
-  assert_int_equal(flexi_bd.panel_selected_formid, INVALID_MASKID);
-  assert_int_equal(flexi_bd.panel_selected_group_cid, FLEXI_GID(1));
-}
-
-// ...and one more click on that group then selects the whole mask
-static void test_element_then_group_reaches_the_whole_mask(void **state)
-{
-  flexi_build("u{1,2,i{3,4}}");
-  _click_element(4);
-  _click_element(4);          // -> its group
-  _click_group(FLEXI_GID(1)); // -> the whole mask
   assert_int_equal(flexi_bd.panel_selected_formid, INVALID_MASKID);
   assert_int_equal(flexi_bd.panel_selected_group_cid, FLEXI_GID(0));
 }
@@ -492,66 +480,6 @@ static void test_click_other_group_switches_directly(void **state)
   _click_group(FLEXI_GID(1));
   _click_group(FLEXI_GID(2));
   assert_int_equal(flexi_bd.panel_selected_group_cid, FLEXI_GID(2));
-}
-
-// ---------------------------------------------------------------------------
-// element chevrons under "auto-expand selected": the click decides what is
-// open, not the selection it also makes
-// ---------------------------------------------------------------------------
-
-// a chevron click with the option on, applied the way _element_chevron_clicked
-// applies it
-static dt_masks_chevron_click_t _chevron(const dt_mask_id_t id, const gboolean expanded)
-{
-  const dt_masks_chevron_click_t c =
-    dt_masks_model_element_chevron_click(&flexi_bd, id, expanded, TRUE);
-  flexi_bd.masks_last_expanded_elem = c.last_expanded;
-  return c;
-}
-
-static void test_chevron_expand_collapses_previous(void **state)
-{
-  flexi_build("u{1,2,3}");
-  flexi_bd.masks_last_expanded_elem = INVALID_MASKID;
-  assert_int_equal(_chevron(1, TRUE).collapse, INVALID_MASKID);
-  assert_int_equal(flexi_bd.masks_last_expanded_elem, 1);
-  assert_int_equal(_chevron(2, TRUE).collapse, 1);
-  assert_int_equal(flexi_bd.masks_last_expanded_elem, 2);
-}
-
-// collapsing the open row must stick, not be re-opened
-static void test_chevron_collapse_forgets_the_open_row(void **state)
-{
-  flexi_build("u{1,2,3}");
-  flexi_bd.masks_last_expanded_elem = 2;
-  assert_int_equal(_chevron(2, FALSE).collapse, INVALID_MASKID);
-  assert_int_equal(flexi_bd.masks_last_expanded_elem, INVALID_MASKID);
-}
-
-static void test_chevron_collapse_of_other_row_keeps_the_open_one(void **state)
-{
-  flexi_build("u{1,2,3}");
-  flexi_bd.masks_last_expanded_elem = 2;
-  assert_int_equal(_chevron(1, FALSE).collapse, INVALID_MASKID);
-  assert_int_equal(flexi_bd.masks_last_expanded_elem, 2);
-}
-
-static void test_chevron_reexpand_open_row_collapses_nothing(void **state)
-{
-  flexi_build("u{1,2,3}");
-  flexi_bd.masks_last_expanded_elem = 1;
-  assert_int_equal(_chevron(1, TRUE).collapse, INVALID_MASKID);
-  assert_int_equal(flexi_bd.masks_last_expanded_elem, 1);
-}
-
-static void test_chevron_without_auto_expand_moves_nothing(void **state)
-{
-  flexi_build("u{1,2,3}");
-  flexi_bd.masks_last_expanded_elem = 2;
-  const dt_masks_chevron_click_t c =
-    dt_masks_model_element_chevron_click(&flexi_bd, 1, TRUE, FALSE);
-  assert_int_equal(c.collapse, INVALID_MASKID);
-  assert_int_equal(c.last_expanded, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -990,7 +918,7 @@ static void test_duplicate_shares_shapes_and_copies_channels(void **state)
 }
 
 // ---------------------------------------------------------------------------
-// what a delete takes away, and the properties subpanel's target
+// what a delete takes away, and the controls' target
 // ---------------------------------------------------------------------------
 
 static int _teardown_canvas(void **state)
@@ -1017,98 +945,67 @@ static void test_canvas_delete_of_shape_is_the_panel_delete(void **state)
   assert_int_equal(_removes(2, OTHER_GROUP_ID), DT_MASKS_REMOVE_FROM_PARENT);
 }
 
-// the properties subpanel follows the selection: a shape's geometry and its
+// the controls follow the selection: a shape's geometry and its
 // opacity
-static void test_props_panel_shows_a_shapes_geometry(void **state)
+static void test_controls_panel_shows_a_shapes_geometry(void **state)
 {
   flexi_conf_init();
   flexi_build("u{1,5}");
   flexi_bd.panel_selected_formid = 1;
-  dt_masks_props_target_t t = dt_masks_model_props_panel_target(&flexi_bd);
+  dt_masks_controls_target_t t = dt_masks_model_controls_target(&flexi_bd, FALSE);
   assert_int_equal(t.id, 1);
   assert_false(t.is_group);
+  assert_false(t.param);
   assert_true(t.shape);
   assert_true(t.opacity);
-  assert_false(t.boost);
 }
 
 // an AI object stored as pixels has no geometry: only its opacity is left
-static void test_props_panel_object_has_only_opacity(void **state)
+static void test_controls_panel_object_has_only_opacity(void **state)
 {
   flexi_conf_init();
   flexi_build("u{1,5}");
   dt_masks_get_from_id(&flexi_dev, 5)->type = DT_MASKS_OBJECT;
   flexi_bd.panel_selected_formid = 5;
-  const dt_masks_props_target_t t = dt_masks_model_props_panel_target(&flexi_bd);
+  const dt_masks_controls_target_t t = dt_masks_model_controls_target(&flexi_bd, FALSE);
   assert_int_equal(t.id, 5);
+  assert_false(t.param);
   assert_false(t.shape);
   assert_true(t.opacity);
 }
 
 // a raster mask has only its opacity, which is what it shows there
-static void test_props_panel_shows_a_raster_masks_opacity(void **state)
+static void test_controls_panel_shows_a_raster_masks_opacity(void **state)
 {
   flexi_conf_init();
   flexi_build("u{1,2}");
   dt_masks_get_from_id(&flexi_dev, 2)->type = DT_MASKS_RASTER;
   flexi_bd.panel_selected_formid = 2;
-  const dt_masks_props_target_t t = dt_masks_model_props_panel_target(&flexi_bd);
+  const dt_masks_controls_target_t t = dt_masks_model_controls_target(&flexi_bd, FALSE);
   assert_int_equal(t.id, 2);
+  assert_false(t.param);
   assert_false(t.shape);
   assert_true(t.opacity);
 }
 
-// the first channel of the scene-referred colorspace with a boost factor, or
-// without one when `boost` is FALSE
-static int _channel_with_boost(const gboolean boost)
-{
-  const dt_iop_gui_blendif_channel_t *ch =
-    dt_develop_blendif_channels_for_csp(DEVELOP_BLEND_CS_RGB_SCENE);
-  for(int k = 0; ch[k].label; k++)
-    if(ch[k].boost_factor_enabled == boost) return k;
-  return -1;
-}
-
-// a parametric channel's boost factor goes there with its opacity, but only
-// for a channel that has one
-static void test_props_panel_parametric_shows_its_boost_factor(void **state)
+// a parametric element has no geometry, and its boost factor is not a
+// property: its sliders and opacity are its controls
+static void test_controls_panel_parametric_has_only_opacity(void **state)
 {
   flexi_conf_init();
   flexi_build("u{1,2}");
-  dt_masks_form_t *f = dt_masks_get_from_id(&flexi_dev, 2);
-  f->type = DT_MASKS_PARAMETRIC;
-  dt_masks_point_parametric_t p = { 0 };
-  p.colorspace = DEVELOP_BLEND_CS_RGB_SCENE;
-  // checked as a signed index: p.channel is unsigned, where the helper's -1
-  // for "none" would become a huge index instead
-  const int with_boost = _channel_with_boost(TRUE);
-  assert_true(with_boost >= 0);
-  p.channel = with_boost;
-  f->points = g_list_append(NULL, &p);
+  dt_masks_get_from_id(&flexi_dev, 2)->type = DT_MASKS_PARAMETRIC;
   flexi_bd.panel_selected_formid = 2;
-
-  dt_masks_props_target_t t = dt_masks_model_props_panel_target(&flexi_bd);
+  const dt_masks_controls_target_t t = dt_masks_model_controls_target(&flexi_bd, FALSE);
   assert_int_equal(t.id, 2);
-  assert_true(t.boost);
-  assert_true(t.opacity);
+  assert_true(t.param);
   assert_false(t.shape);
-
-  // no boost factor: only the opacity slider is left to show
-  const int without_boost = _channel_with_boost(FALSE);
-  assert_true(without_boost >= 0);
-  p.channel = without_boost;
-  t = dt_masks_model_props_panel_target(&flexi_bd);
-  assert_int_equal(t.id, 2);
-  assert_false(t.boost);
   assert_true(t.opacity);
-
-  g_list_free(f->points);
-  f->points = NULL;
 }
 
 // a group selection alone shows the group's opacity; an element selected in
 // it wins, as for the refinements
-static void test_props_panel_shows_a_groups_opacity(void **state)
+static void test_controls_panel_shows_a_groups_opacity(void **state)
 {
   flexi_conf_init();
   flexi_build("u{1,5}");
@@ -1116,24 +1013,53 @@ static void test_props_panel_shows_a_groups_opacity(void **state)
   assert_true(dt_masks_point_is_marker(head));
   flexi_bd.panel_selected_formid = INVALID_MASKID;
   flexi_bd.panel_selected_group_cid = head->formid;
-  const dt_masks_props_target_t t = dt_masks_model_props_panel_target(&flexi_bd);
+  const dt_masks_controls_target_t t = dt_masks_model_controls_target(&flexi_bd, FALSE);
   assert_int_equal(t.id, head->formid);
   assert_true(t.is_group);
+  assert_false(t.param);
   assert_true(t.opacity);
   assert_false(t.shape);
   flexi_bd.panel_selected_formid = 1;
-  assert_false(dt_masks_model_props_panel_target(&flexi_bd).is_group);
-  assert_int_equal(dt_masks_model_props_panel_target(&flexi_bd).id, 1);
+  assert_false(dt_masks_model_controls_target(&flexi_bd, FALSE).is_group);
+  assert_int_equal(dt_masks_model_controls_target(&flexi_bd, FALSE).id, 1);
 }
 
 // nothing selected: nothing to show
-static void test_props_panel_empty_without_a_selection(void **state)
+static void test_controls_panel_empty_without_a_selection(void **state)
 {
   flexi_conf_init();
   flexi_build("u{1}");
   flexi_bd.panel_selected_formid = INVALID_MASKID;
   flexi_bd.panel_selected_group_cid = INVALID_MASKID;
-  assert_int_equal(dt_masks_model_props_panel_target(&flexi_bd).id, INVALID_MASKID);
+  assert_int_equal(dt_masks_model_controls_target(&flexi_bd, FALSE).id, INVALID_MASKID);
+}
+
+// several members picked together: nobody has controls
+static void test_controls_hidden_while_several_are_picked(void **state)
+{
+  flexi_conf_init();
+  flexi_build("u{1,2}");
+  flexi_bd.panel_selected_formid = 1;
+  flexi_bd.masks_picked = g_list_prepend(g_list_prepend(NULL, GINT_TO_POINTER(1)),
+                                         GINT_TO_POINTER(2));
+  const dt_masks_controls_target_t t = dt_masks_model_controls_target(&flexi_bd, FALSE);
+  assert_false(t.opacity);
+  assert_int_equal(t.id, INVALID_MASKID);
+  g_list_free(flexi_bd.masks_picked);
+  flexi_bd.masks_picked = NULL;
+}
+
+// an element hovered on the canvas takes the selection's place for the panels
+// that show it, and for them alone
+static void test_controls_follow_the_hover_when_asked(void **state)
+{
+  flexi_conf_init();
+  flexi_build("u{1,5}");
+  flexi_bd.panel_selected_formid = 1;
+  flexi_bd.canvas_hovered_formid = 5;
+  assert_int_equal(dt_masks_model_controls_target(&flexi_bd, TRUE).id, 5);
+  assert_int_equal(dt_masks_model_controls_target(&flexi_bd, FALSE).id, 1);
+  flexi_bd.canvas_hovered_formid = INVALID_MASKID;
 }
 
 // a group selected on its own isolates its members. The mask's own group holds
@@ -1645,10 +1571,10 @@ static void test_nested_points_are_found_with_their_group(void **state)
 static void test_nested_drop_stays_in_its_list(void **state)
 {
   dt_masks_form_t *grp = _two_levels();
-  assert_true(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 11, 13, TRUE));
+  assert_true(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 11, 13, TRUE));
   assert_layout("u{1,2,i{3,u{12,d{13,11}}}}");
 
-  assert_true(dt_masks_model_drop_element_onto_group(&flexi_module, grp, 13, FLEXI_GID(2)));
+  assert_true(dt_masks_model_drop_member_onto_group(&flexi_module, grp, 13, FLEXI_GID(2)));
   assert_layout("u{1,2,i{3,u{12,d{11},13}}}");
 }
 
@@ -1656,16 +1582,16 @@ static void test_nested_drop_stays_in_its_list(void **state)
 static void test_nested_drop_moves_across_levels(void **state)
 {
   dt_masks_form_t *grp = _two_levels();
-  assert_true(dt_masks_model_drop_element_onto_element(&flexi_module, grp, 1, 13, TRUE));
+  assert_true(dt_masks_model_drop_member_onto_member(&flexi_module, grp, 1, 13, TRUE));
   assert_layout("u{2,i{3,u{11,12,d{13,1}}}}");
   assert_int_equal(dt_masks_gui_group_point(grp, 1)->parentid, FLEXI_SUB(3));
 
-  assert_true(dt_masks_model_drop_element_onto_group(&flexi_module, grp, 12, FLEXI_GID(0)));
+  assert_true(dt_masks_model_drop_member_onto_group(&flexi_module, grp, 12, FLEXI_GID(0)));
   assert_layout("u{2,i{3,u{11,d{13,1}}},12}");
   assert_int_equal(dt_masks_gui_group_point(grp, 12)->parentid, flexi_group()->formid);
 
-  assert_false(dt_masks_model_drop_element_onto_element(&flexi_module, grp, FLEXI_SUB(2), 11, TRUE));
-  assert_false(dt_masks_model_drop_element_onto_group(&flexi_module, grp, FLEXI_SUB(2), FLEXI_GID(3)));
+  assert_false(dt_masks_model_drop_member_onto_member(&flexi_module, grp, FLEXI_SUB(2), 11, TRUE));
+  assert_false(dt_masks_model_drop_member_onto_group(&flexi_module, grp, FLEXI_SUB(2), FLEXI_GID(3)));
   assert_layout("u{2,i{3,u{11,d{13,1}}},12}");
 }
 
@@ -1673,32 +1599,11 @@ static void test_nested_drop_moves_across_levels(void **state)
 static void test_a_nested_group_goes_deeper(void **state)
 {
   dt_masks_form_t *grp = flexi_build("u{1,2,i{3,u{11,12,d{13}}},u{14}}");
-  assert_true(dt_masks_model_drop_element_onto_group(&flexi_module, grp, FLEXI_SUB(4), FLEXI_GID(2)));
+  assert_true(dt_masks_model_drop_member_onto_group(&flexi_module, grp, FLEXI_SUB(4), FLEXI_GID(2)));
   assert_layout("u{1,2,i{3,u{11,12,d{13},u{14}}}}");
-  assert_true(dt_masks_model_drop_element_onto_element(&flexi_module, grp, FLEXI_SUB(4), 13, TRUE));
+  assert_true(dt_masks_model_drop_member_onto_member(&flexi_module, grp, FLEXI_SUB(4), 13, TRUE));
   assert_layout("u{1,2,i{3,u{11,12,d{13,u{14}}}}}");
   assert_true(dt_is_valid_maskid(dt_masks_model_nest_new_group(grp, 0, FLEXI_GID(2))));
-}
-
-// a cluster moves between nesting levels as its elements do, one by one
-static void test_a_cluster_moves_across_levels(void **state)
-{
-  dt_masks_form_t *grp = _two_levels();
-  GList *ids = g_list_append(g_list_append(NULL, GINT_TO_POINTER(11)), GINT_TO_POINTER(12));
-  assert_true(dt_masks_gui_cluster_move(&flexi_module, ids, 3, FALSE, TRUE));
-  assert_layout("u{1,2,i{3,11,12,u{d{13}}}}");
-  assert_int_equal(dt_masks_gui_group_point(grp, 11)->parentid, FLEXI_SUB(1));
-  g_list_free(ids);
-
-  ids = g_list_append(g_list_append(NULL, GINT_TO_POINTER(1)), GINT_TO_POINTER(2));
-  assert_true(dt_masks_gui_cluster_move(&flexi_module, ids, FLEXI_GID(3), TRUE, FALSE));
-  assert_layout("u{i{3,11,12,u{d{13,1,2}}}}");
-  assert_int_equal(dt_masks_gui_group_point(grp, 1)->parentid, FLEXI_SUB(3));
-
-  // onto the group it is already in: nothing to do, as for one element
-  assert_false(dt_masks_gui_cluster_move(&flexi_module, ids, FLEXI_GID(3), TRUE, FALSE));
-  assert_layout("u{i{3,11,12,u{d{13,1,2}}}}");
-  g_list_free(ids);
 }
 
 // a shape the mask holds twice, once in a nested group: a drop acts on the
@@ -1855,6 +1760,453 @@ static void test_compose_stops_where_nesting_does(void **state)
   assert_true(dt_is_valid_maskid(dt_masks_model_compose(grp, dt_masks_gui_group_point(grp, 1), DT_MASKS_STATE_FLEXI_MINIMUM)));
 }
 
+// ---------------------------------------------------------------------------
+// the multiple selection
+// ---------------------------------------------------------------------------
+
+static GList *_points_of(dt_masks_form_t *grp, const int n, ...)
+{
+  GList *pts = NULL;
+  va_list ap;
+  va_start(ap, n);
+  for(int i = 0; i < n; i++)
+    pts = g_list_append(pts, dt_masks_gui_group_point(grp, va_arg(ap, int)));
+  va_end(ap);
+  return pts;
+}
+
+// the picks act as members of the lists that hold them, bottom-up: a group is
+// the member its holder has for it, what a picked group holds goes with it, and
+// the mask's own group is no pick
+static void test_picked_points_are_members_bottom_up(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4},5}");
+  GList *picked = NULL;
+  for(int i = 5; i >= 1; i--) // the order picked is not the order held
+    picked = g_list_append(picked, GINT_TO_POINTER(i));
+  picked = g_list_append(picked, GINT_TO_POINTER(FLEXI_GID(1)));
+  picked = g_list_append(picked, GINT_TO_POINTER(FLEXI_GID(0)));
+  GList *pts = dt_masks_model_picked_points(grp, picked);
+  // 3 and 4 go with their group
+  assert_int_equal(g_list_length(pts), 4);
+  const dt_mask_id_t want[] = { 1, 2, FLEXI_SUB(1), 5 };
+  int k = 0;
+  for(const GList *l = pts; l; l = g_list_next(l))
+    assert_int_equal(((dt_masks_point_group_t *)l->data)->formid, want[k++]);
+  g_list_free(pts);
+
+  // alone, they are picks
+  g_list_free(picked);
+  picked = g_list_append(g_list_append(NULL, GINT_TO_POINTER(3)), GINT_TO_POINTER(4));
+  pts = dt_masks_model_picked_points(grp, picked);
+  assert_int_equal(g_list_length(pts), 2);
+  g_list_free(pts);
+  g_list_free(picked);
+}
+
+// grouping puts the picks in a new group where the topmost was, in the order
+// they were held
+static void test_group_the_picks_together(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,3,4}");
+  GList *pts = _points_of(grp, 2, 4, 2);
+  const dt_mask_id_t cid = dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_FLEXI_DIFFERENCE);
+  g_list_free(pts);
+  assert_true(dt_is_valid_maskid(cid));
+  assert_tree(grp, "u{1,3,d{2,4}}");
+  assert_int_equal(dt_masks_gui_group_cid_of_form(grp, 2), cid);
+  assert_int_equal(dt_masks_gui_group_cid_of_form(grp, 4), cid);
+  assert_int_equal(dt_masks_gui_group_point(grp, 2)->parentid, dt_masks_gui_group_point(grp, 4)->parentid);
+}
+
+// a group is grouped as the member it is, settings and all
+static void test_group_a_group_and_a_member(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,u@0.5{11,12},3}");
+  GList *pts = _points_of(grp, 2, 1, FLEXI_SUB(1));
+  assert_true(dt_is_valid_maskid(dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_UNION)));
+  g_list_free(pts);
+  assert_tree(grp, "u{u{1,u@0.5{11,12}},3}");
+}
+
+// one point is wrapped: it goes into a new group where it was, an element
+// or a group alike
+static void test_group_wraps_one_point(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,u@0.5{11,12},3}");
+  GList *pts = _points_of(grp, 1, 3);
+  assert_true(dt_is_valid_maskid(dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_FLEXI_DIFFERENCE)));
+  g_list_free(pts);
+  assert_tree(grp, "u{1,u@0.5{11,12},d{3}}");
+
+  pts = _points_of(grp, 1, FLEXI_SUB(1));
+  assert_true(dt_is_valid_maskid(dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_UNION)));
+  g_list_free(pts);
+  assert_tree(grp, "u{1,u{u@0.5{11,12}},d{3}}");
+}
+
+// grouping is no move from one group to another, and not past where groups nest
+static void test_group_the_picks_in_one_group_only(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{2},3}");
+  GList *pts = _points_of(grp, 2, 1, 2);
+  assert_false(dt_is_valid_maskid(dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_UNION)));
+  g_list_free(pts);
+  assert_tree(grp, "u{1,i{2},3}");
+
+  pts = _points_of(grp, 2, 1, 3);
+  assert_true(dt_is_valid_maskid(dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_UNION)));
+  g_list_free(pts);
+  assert_tree(grp, "u{i{2},u{1,3}}");
+}
+
+static void test_group_the_picks_stops_where_nesting_does(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2}");
+  dt_mask_id_t cid = FLEXI_GID(0);
+  for(int depth = 1; depth <= DT_MASKS_NESTING_MAX; depth++)
+    cid = dt_masks_model_nest_new_group(grp, 0, cid);
+  // the deepest group, in its holder: one more level than a walk follows
+  const dt_masks_form_t *deepest = dt_masks_model_nested_group_of(grp, cid);
+  assert_non_null(deepest);
+  GList *deep = g_list_append(NULL, dt_masks_gui_group_point(grp, deepest->formid));
+  assert_false(dt_is_valid_maskid(dt_masks_model_group_points(grp, deep, DT_MASKS_STATE_UNION)));
+  g_list_free(deep);
+  GList *pts = _points_of(grp, 1, 1);
+  assert_true(dt_is_valid_maskid(dt_masks_model_group_points(grp, pts, DT_MASKS_STATE_UNION)));
+  g_list_free(pts);
+}
+
+// the picks go on top of the group, one after the other, so they keep their
+// order, and the ones already there stay put
+static void test_move_the_picks_into_a_group(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,i{3},d{4}}");
+  GList *pts = _points_of(grp, 2, 1, 2);
+  assert_int_equal(dt_masks_model_move_points(&flexi_module, grp, pts, FLEXI_GID(1)), 2);
+  g_list_free(pts);
+  assert_layout("u{i{3,1,2},d{4}}");
+
+  pts = _points_of(grp, 2, 3, 1);
+  assert_int_equal(dt_masks_model_move_points(&flexi_module, grp, pts, FLEXI_GID(1)), 0);
+  g_list_free(pts);
+
+  // a group moves as the member it is, but not into itself
+  pts = _points_of(grp, 1, FLEXI_SUB(2));
+  assert_int_equal(dt_masks_model_move_points(&flexi_module, grp, pts, FLEXI_GID(1)), 1);
+  g_list_free(pts);
+  assert_layout("u{i{3,1,2,d{4}}}");
+  pts = _points_of(grp, 1, FLEXI_SUB(1));
+  assert_int_equal(dt_masks_model_move_points(&flexi_module, grp, pts, FLEXI_GID(2)), 0);
+  g_list_free(pts);
+}
+
+// shift+click: the first pick joins what is selected, and the picks end when
+// one is left
+static void test_pick_toggle_joins_the_selection(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,i{3,4},5}");
+  GList *picked = NULL;
+
+  // the mask's own group is selected by default, and picking in it is picking
+  // all that it holds but the row: it is a selected group like any other
+  dt_masks_pick_result_t r = dt_masks_model_pick_toggle(grp, &picked, INVALID_MASKID, FLEXI_GID(0), 1);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_int_equal(g_list_length(picked), 5);
+  assert_null(g_list_find(picked, GINT_TO_POINTER(1)));
+  assert_null(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(0))));
+  assert_non_null(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(1))));
+  g_list_free(picked);
+  picked = NULL;
+
+  // a click on what is selected unselects it
+  r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 1);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CLICK);
+  assert_int_equal(r.id, 1);
+
+  // 1 selected: 2 joins it. 5 is added, and taking 1 off keeps two
+  r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 2);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_int_equal(g_list_length(picked), 2);
+  r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 5);
+  assert_int_equal(g_list_length(picked), 3);
+  r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 1);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_int_equal(g_list_length(picked), 2);
+
+  // down to one: it is the selection, and there are no picks
+  r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 2);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_SELECT);
+  assert_int_equal(r.id, 5);
+  assert_null(picked);
+}
+
+// a group is picked whole: with it, all it holds at any depth, and the
+// members shown as the picks that act are the group alone
+static void test_pick_toggle_picks_a_group_whole(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3,x{6,7}},5}");
+  GList *picked = NULL;
+  dt_masks_pick_result_t r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  // 1 and the group, with 3, the group inside it, and its 6 and 7
+  assert_int_equal(g_list_length(picked), 6);
+  const dt_mask_id_t want[] = { 1, FLEXI_GID(1), 3, FLEXI_GID(2), 6, 7 };
+  for(int i = 0; i < 6; i++)
+    assert_true(g_list_find(picked, GINT_TO_POINTER(want[i])) != NULL);
+  GList *pts = dt_masks_model_picked_points(grp, picked);
+  assert_int_equal(g_list_length(pts), 2);
+  g_list_free(pts);
+
+  // a group selected by its header is picked whole, and the click then takes a
+  // member of it off, the group with it: what is left is the rest of its members
+  g_list_free(picked);
+  picked = NULL;
+  r = dt_masks_model_pick_toggle(grp, &picked, INVALID_MASKID, FLEXI_GID(1), 3);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_int_equal(g_list_length(picked), 3); // the group inside, with 6 and 7
+  assert_null(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(1))));
+  assert_non_null(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(2))));
+  g_list_free(picked);
+}
+
+// taking a member off a group picked whole leaves the group not whole, and so
+// not picked; the other members stay. Taking the group off takes all of it
+static void test_pick_toggle_takes_a_group_off_whole(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3,x{6,7}},5}");
+  GList *picked = NULL;
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 7);
+  // 7 gone, and both groups above it; 1, 3 and 6 remain
+  assert_int_equal(g_list_length(picked), 3);
+  assert_null(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(1))));
+  assert_null(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(2))));
+  assert_non_null(g_list_find(picked, GINT_TO_POINTER(6)));
+  GList *pts = dt_masks_model_picked_points(grp, picked);
+  assert_int_equal(g_list_length(pts), 3); // 1, 3 and 6, each in its own place
+  g_list_free(pts);
+
+  // put the group back, then take it off: only 1 is left, which is selected
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  assert_int_equal(g_list_length(picked), 6);
+  const dt_masks_pick_result_t r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  assert_int_equal(r.outcome, DT_MASKS_PICK_SELECT);
+  assert_int_equal(r.id, 1);
+  assert_null(picked);
+  g_list_free(picked);
+}
+
+// a group of one member, picked with it, ends with nothing picked if either is
+// taken off
+static void test_pick_toggle_can_leave_no_picks(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3}}");
+  GList *picked = NULL;
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  assert_int_equal(g_list_length(picked), 3); // 1, the group and 3
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 1);
+  assert_int_equal(g_list_length(picked), 2);
+  const dt_masks_pick_result_t r = dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), 3);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_null(picked);
+}
+
+// the row of a group names it by its form id, and picks it by its cid; a
+// click on the mask's own group, or on nothing the mask holds, picks nothing
+static void test_pick_toggle_names_a_group_by_its_cid(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3},5}");
+  GList *picked = NULL;
+  assert_int_equal(dt_masks_model_pick_id(FLEXI_SUB(1)), FLEXI_GID(1));
+  assert_int_equal(dt_masks_model_pick_id(5), 5);
+
+  dt_masks_pick_result_t r = dt_masks_model_pick_toggle(grp, &picked, 5, FLEXI_GID(0), FLEXI_SUB(1));
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_true(g_list_find(picked, GINT_TO_POINTER(FLEXI_GID(1))) != NULL);
+  g_list_free(picked);
+  picked = NULL;
+
+  r = dt_masks_model_pick_toggle(grp, &picked, 5, FLEXI_GID(0), FLEXI_GID(0));
+  assert_int_equal(r.outcome, DT_MASKS_PICK_IGNORED);
+  r = dt_masks_model_pick_toggle(grp, &picked, 5, FLEXI_GID(0), 99);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_IGNORED);
+  assert_null(picked);
+}
+
+static void test_pick_toggle_in_the_whole_mask_takes_a_member_off(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3},5}");
+  GList *picked = NULL;
+
+  // from the mask's own group, an element of a nested one: the group that holds
+  // it is not whole any more, and so is not picked
+  dt_masks_pick_result_t r = dt_masks_model_pick_toggle(grp, &picked, INVALID_MASKID, FLEXI_GID(0), 3);
+  assert_int_equal(r.outcome, DT_MASKS_PICK_CHANGED);
+  assert_int_equal(g_list_length(picked), 2);
+  assert_non_null(g_list_find(picked, GINT_TO_POINTER(1)));
+  assert_non_null(g_list_find(picked, GINT_TO_POINTER(5)));
+
+  // and the mask is no pick, with picks or without
+  r = dt_masks_model_pick_toggle(grp, &picked, INVALID_MASKID, FLEXI_GID(0), FLEXI_GID(0));
+  assert_int_equal(r.outcome, DT_MASKS_PICK_IGNORED);
+  assert_int_equal(g_list_length(picked), 2);
+  g_list_free(picked);
+}
+
+static void test_picks_prune_what_the_mask_lost(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,3}");
+  GList *picked = g_list_append(g_list_append(g_list_append(NULL, GINT_TO_POINTER(1)),
+                                              GINT_TO_POINTER(2)), GINT_TO_POINTER(99));
+  dt_masks_model_picks_prune(grp, &picked);
+  assert_int_equal(g_list_length(picked), 2);
+  // one left is no multiple selection
+  picked = g_list_remove(picked, GINT_TO_POINTER(2));
+  picked = g_list_append(picked, GINT_TO_POINTER(98));
+  dt_masks_model_picks_prune(grp, &picked);
+  assert_null(picked);
+}
+
+// a group that gained a member since it was picked whole is not picked any more,
+// nor is the group above it
+static void test_picks_prune_a_group_no_longer_whole(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3,x{6,7}},5}");
+  GList *picked = NULL;
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  dt_masks_model_picks_prune(grp, &picked);
+  assert_int_equal(g_list_length(picked), 6);
+
+  picked = g_list_remove(picked, GINT_TO_POINTER(7));
+  dt_masks_model_picks_prune(grp, &picked);
+  assert_int_equal(g_list_length(picked), 3); // 1, 3 and 6
+  g_list_free(picked);
+}
+
+// the canvas highlights each picked element, which are the members of the
+// groups picked whole
+static void test_picks_canvas_ids(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3,4},5}");
+  GList *picked = NULL;
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  GList *ids = dt_masks_model_picks_canvas_ids(grp, picked);
+  assert_int_equal(g_list_length(ids), 3);
+  assert_true(g_list_find(ids, GINT_TO_POINTER(1)) != NULL);
+  assert_true(g_list_find(ids, GINT_TO_POINTER(3)) != NULL);
+  assert_true(g_list_find(ids, GINT_TO_POINTER(4)) != NULL);
+  g_list_free(ids);
+  g_list_free(picked);
+}
+
+// the groups the picks may go into, top-down: not where they all are already,
+// and not a group inside itself
+static void test_move_targets(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,i{3},d{4}}");
+  GList *pts = _points_of(grp, 2, 1, 2);
+  GList *targets = dt_masks_model_move_targets(grp, pts);
+  g_list_free(pts);
+  assert_int_equal(g_list_length(targets), 2);
+  assert_int_equal(GPOINTER_TO_INT(targets->data), FLEXI_GID(1));
+  assert_int_equal(GPOINTER_TO_INT(targets->next->data), FLEXI_GID(2));
+  g_list_free(targets);
+
+  // 3 is in the first group: the mask's own and the other group remain
+  pts = _points_of(grp, 1, 3);
+  targets = dt_masks_model_move_targets(grp, pts);
+  g_list_free(pts);
+  assert_int_equal(g_list_length(targets), 2);
+  assert_int_equal(GPOINTER_TO_INT(targets->data), FLEXI_GID(0));
+  assert_int_equal(GPOINTER_TO_INT(targets->next->data), FLEXI_GID(2));
+  g_list_free(targets);
+
+  // a group is no target for itself, nor for what it holds
+  pts = _points_of(grp, 1, FLEXI_SUB(1));
+  targets = dt_masks_model_move_targets(grp, pts);
+  g_list_free(pts);
+  assert_int_equal(g_list_length(targets), 1);
+  assert_int_equal(GPOINTER_TO_INT(targets->data), FLEXI_GID(2));
+  g_list_free(targets);
+}
+
+// the eye and the invert button of a picked row set every pick to the state
+// the click gives that one, a group's own bits being its bypass and its output
+static void test_picks_take_the_state_a_click_gives(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,2,i{3},5}");
+  dt_masks_point_group_t *one = dt_masks_gui_group_point(grp, 1);
+  dt_masks_point_group_t *two = dt_masks_gui_group_point(grp, 2);
+  dt_masks_point_group_t *group = dt_masks_gui_group_point(grp, FLEXI_GID(1));
+  two->state |= DT_MASKS_STATE_DISABLE;
+  GList *picked = g_list_append(g_list_append(g_list_append(NULL, GINT_TO_POINTER(1)),
+                                              GINT_TO_POINTER(2)), GINT_TO_POINTER(FLEXI_GID(1)));
+  gboolean groups = FALSE;
+
+  // clicked on 1, which is on: all end off, 2 included
+  assert_true(dt_masks_model_picks_toggle_flag(grp, picked, 1, DT_MASKS_PICK_FLAG_DISABLE, &groups));
+  assert_true(groups);
+  assert_true(one->state & DT_MASKS_STATE_DISABLE);
+  assert_true(two->state & DT_MASKS_STATE_DISABLE);
+  assert_true(group->state & DT_MASKS_STATE_OP_BYPASS);
+  assert_false(group->state & DT_MASKS_STATE_DISABLE);
+
+  // and again from the group's header: all back
+  assert_true(dt_masks_model_picks_toggle_flag(grp, picked, FLEXI_GID(1), DT_MASKS_PICK_FLAG_DISABLE, &groups));
+  assert_false(one->state & DT_MASKS_STATE_DISABLE);
+  assert_false(two->state & DT_MASKS_STATE_DISABLE);
+  assert_false(group->state & DT_MASKS_STATE_OP_BYPASS);
+
+  // the invert button: an element's inversion, a group's output
+  assert_true(dt_masks_model_picks_toggle_flag(grp, picked, 2, DT_MASKS_PICK_FLAG_INVERT, &groups));
+  assert_true(one->state & DT_MASKS_STATE_INVERSE);
+  assert_true(group->state & DT_MASKS_STATE_OP_INVERT);
+  assert_false(group->state & DT_MASKS_STATE_INVERSE);
+
+  // elements alone need no rebuild, and a row not picked is nobody's business
+  g_list_free(picked);
+  picked = g_list_append(g_list_append(NULL, GINT_TO_POINTER(1)), GINT_TO_POINTER(2));
+  assert_true(dt_masks_model_picks_toggle_flag(grp, picked, 1, DT_MASKS_PICK_FLAG_DISABLE, &groups));
+  assert_false(groups);
+  assert_false(dt_masks_model_picks_toggle_flag(grp, picked, 5, DT_MASKS_PICK_FLAG_DISABLE, &groups));
+  assert_false(dt_masks_gui_group_point(grp, 5)->state & DT_MASKS_STATE_DISABLE);
+  g_list_free(picked);
+}
+
+// what a picked group holds is covered by the group's state: a button of the
+// group changes the group and not its members, and a button of a member acts
+// on it alone
+static void test_picks_leave_what_a_group_holds(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3,4},5}");
+  GList *picked = NULL;
+  dt_masks_model_pick_toggle(grp, &picked, 1, FLEXI_GID(0), FLEXI_SUB(1));
+  gboolean groups = FALSE;
+  assert_true(dt_masks_model_picks_toggle_flag(grp, picked, FLEXI_GID(1), DT_MASKS_PICK_FLAG_INVERT, &groups));
+  assert_true(groups);
+  assert_true(dt_masks_gui_group_point(grp, FLEXI_GID(1))->state & DT_MASKS_STATE_OP_INVERT);
+  assert_true(dt_masks_gui_group_point(grp, 1)->state & DT_MASKS_STATE_INVERSE);
+  assert_false(dt_masks_gui_group_point(grp, 3)->state & DT_MASKS_STATE_INVERSE);
+  assert_false(dt_masks_gui_group_point(grp, 4)->state & DT_MASKS_STATE_INVERSE);
+  assert_false(dt_masks_model_picks_toggle_flag(grp, picked, 3, DT_MASKS_PICK_FLAG_INVERT, &groups));
+  assert_false(dt_masks_model_picks_set_op(grp, picked, 3, DT_MASKS_STATE_FLEXI_MINIMUM));
+  g_list_free(picked);
+}
+
+// the operator of one picked group is every picked group's, and nothing else's
+static void test_picks_take_an_operator(void **state)
+{
+  dt_masks_form_t *grp = flexi_build("u{1,i{3},d{4},x{5}}");
+  GList *picked = g_list_append(g_list_append(g_list_append(NULL, GINT_TO_POINTER(1)),
+                                              GINT_TO_POINTER(FLEXI_GID(1))), GINT_TO_POINTER(FLEXI_GID(2)));
+  assert_true(dt_masks_model_picks_set_op(grp, picked, FLEXI_GID(1), DT_MASKS_STATE_FLEXI_MINIMUM));
+  assert_tree(grp, "u{1,i{3},i{4},x{5}}");
+  assert_false(dt_masks_model_picks_set_op(grp, picked, FLEXI_GID(3), DT_MASKS_STATE_FLEXI_MINIMUM));
+  assert_tree(grp, "u{1,i{3},i{4},x{5}}");
+  g_list_free(picked);
+}
+
 // compose, then simplify with the empty group still empty: back where it was
 static void test_simplify_undoes_a_compose(void **state)
 {
@@ -1995,7 +2347,7 @@ static void test_a_group_beside_a_nested_group_joins_its_holder(void **state)
 
 // nested groups shown as groups reorder among their holder's elements, and
 // go inside another group as elements
-static void test_a_nested_group_moves_as_an_element(void **state)
+static void test_a_nested_group_moves_as_a_member(void **state)
 {
   flexi_build("u{1,2,i{3,u{11},u{12}}}");
   assert_true(dt_masks_model_move_group(&flexi_module, FLEXI_GID(2), FLEXI_GID(3), TRUE, FALSE));
@@ -2139,16 +2491,10 @@ int main(void)
     cmocka_unit_test_teardown(test_click_selected_group_selects_the_whole_mask, _teardown),
     cmocka_unit_test_teardown(test_click_mask_group_again_keeps_it_selected, _teardown),
     cmocka_unit_test_teardown(test_click_element_selects_element_and_its_group, _teardown),
-    cmocka_unit_test_teardown(test_click_selected_element_falls_back_to_its_group, _teardown),
-    cmocka_unit_test_teardown(test_element_then_group_reaches_the_whole_mask, _teardown),
+    cmocka_unit_test_teardown(test_click_selected_element_falls_back_to_the_whole_mask, _teardown),
     cmocka_unit_test_teardown(test_click_group_of_selected_element_selects_the_group, _teardown),
     cmocka_unit_test_teardown(test_click_other_element_switches_directly, _teardown),
     cmocka_unit_test_teardown(test_click_other_group_switches_directly, _teardown),
-    cmocka_unit_test_teardown(test_chevron_expand_collapses_previous, _teardown),
-    cmocka_unit_test_teardown(test_chevron_collapse_forgets_the_open_row, _teardown),
-    cmocka_unit_test_teardown(test_chevron_collapse_of_other_row_keeps_the_open_one, _teardown),
-    cmocka_unit_test_teardown(test_chevron_reexpand_open_row_collapses_nothing, _teardown),
-    cmocka_unit_test_teardown(test_chevron_without_auto_expand_moves_nothing, _teardown),
     cmocka_unit_test_teardown(test_isolate_state_hides_everything_else, _teardown),
     cmocka_unit_test_teardown(test_isolate_state_null_list_clears_everywhere, _teardown),
     cmocka_unit_test_teardown(test_isolate_state_soloing_a_whole_group, _teardown),
@@ -2170,13 +2516,15 @@ int main(void)
                               _teardown_linking),
     cmocka_unit_test_teardown(test_canvas_delete_of_shape_is_the_panel_delete,
                               _teardown_canvas),
-    cmocka_unit_test_teardown(test_props_panel_shows_a_shapes_geometry, _teardown_canvas),
-    cmocka_unit_test_teardown(test_props_panel_object_has_only_opacity, _teardown_canvas),
-    cmocka_unit_test_teardown(test_props_panel_shows_a_raster_masks_opacity, _teardown_canvas),
-    cmocka_unit_test_teardown(test_props_panel_parametric_shows_its_boost_factor,
+    cmocka_unit_test_teardown(test_controls_panel_shows_a_shapes_geometry, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_panel_object_has_only_opacity, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_panel_shows_a_raster_masks_opacity, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_panel_parametric_has_only_opacity,
                               _teardown_canvas),
-    cmocka_unit_test_teardown(test_props_panel_shows_a_groups_opacity, _teardown_canvas),
-    cmocka_unit_test_teardown(test_props_panel_empty_without_a_selection, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_panel_shows_a_groups_opacity, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_panel_empty_without_a_selection, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_hidden_while_several_are_picked, _teardown_canvas),
+    cmocka_unit_test_teardown(test_controls_follow_the_hover_when_asked, _teardown_canvas),
     cmocka_unit_test_teardown(test_soloedit_isolates_a_selected_group, _teardown),
     cmocka_unit_test_teardown(test_soloedit_off_for_the_mask_group, _teardown),
     cmocka_unit_test_teardown(test_refine_scope_of_removed_element_falls_back_to_its_group,
@@ -2210,7 +2558,6 @@ int main(void)
     cmocka_unit_test_teardown(test_nested_drop_stays_in_its_list, _teardown_nested),
     cmocka_unit_test_teardown(test_nested_drop_moves_across_levels, _teardown_nested),
     cmocka_unit_test_teardown(test_a_nested_group_goes_deeper, _teardown_nested),
-    cmocka_unit_test_teardown(test_a_cluster_moves_across_levels, _teardown_nested),
     cmocka_unit_test_teardown(test_a_drop_acts_on_the_row_reference, _teardown_nested),
     cmocka_unit_test_teardown(test_nesting_stops_where_walks_stop, _teardown_nested),
     cmocka_unit_test_teardown(test_add_a_group_inside_a_group, _teardown_nested),
@@ -2219,6 +2566,26 @@ int main(void)
     cmocka_unit_test_teardown(test_compose_a_nested_group, _teardown_composed),
     cmocka_unit_test_teardown(test_compose_the_whole_mask, _teardown_composed),
     cmocka_unit_test_teardown(test_compose_stops_where_nesting_does, _teardown_composed),
+    cmocka_unit_test(test_picked_points_are_members_bottom_up),
+    cmocka_unit_test(test_pick_toggle_joins_the_selection),
+    cmocka_unit_test(test_pick_toggle_picks_a_group_whole),
+    cmocka_unit_test(test_pick_toggle_takes_a_group_off_whole),
+    cmocka_unit_test(test_pick_toggle_can_leave_no_picks),
+    cmocka_unit_test(test_pick_toggle_in_the_whole_mask_takes_a_member_off),
+    cmocka_unit_test(test_pick_toggle_names_a_group_by_its_cid),
+    cmocka_unit_test(test_picks_prune_what_the_mask_lost),
+    cmocka_unit_test(test_picks_prune_a_group_no_longer_whole),
+    cmocka_unit_test(test_picks_canvas_ids),
+    cmocka_unit_test_teardown(test_move_targets, _teardown_composed),
+    cmocka_unit_test(test_picks_take_the_state_a_click_gives),
+    cmocka_unit_test(test_picks_take_an_operator),
+    cmocka_unit_test(test_picks_leave_what_a_group_holds),
+    cmocka_unit_test_teardown(test_group_the_picks_together, _teardown_composed),
+    cmocka_unit_test_teardown(test_group_a_group_and_a_member, _teardown_composed),
+    cmocka_unit_test_teardown(test_group_wraps_one_point, _teardown_composed),
+    cmocka_unit_test_teardown(test_group_the_picks_in_one_group_only, _teardown_composed),
+    cmocka_unit_test_teardown(test_group_the_picks_stops_where_nesting_does, _teardown_composed),
+    cmocka_unit_test_teardown(test_move_the_picks_into_a_group, _teardown_composed),
     cmocka_unit_test_teardown(test_simplify_undoes_a_compose, _teardown_composed),
     cmocka_unit_test_teardown(test_hoist_undoes_a_whole_mask_compose, _teardown_composed),
     cmocka_unit_test_teardown(test_simplify_splices_same_operator_groups, _teardown_composed),
@@ -2228,7 +2595,7 @@ int main(void)
     cmocka_unit_test_teardown(test_a_nested_group_does_not_move_beside_the_mask, _teardown_nested),
     cmocka_unit_test_teardown(test_a_faded_nested_group_stays_nested, _teardown_nested),
     cmocka_unit_test_teardown(test_a_group_beside_a_nested_group_joins_its_holder, _teardown_nested),
-    cmocka_unit_test_teardown(test_a_nested_group_moves_as_an_element, _teardown_nested),
+    cmocka_unit_test_teardown(test_a_nested_group_moves_as_a_member, _teardown_nested),
     cmocka_unit_test_teardown(test_new_element_lands_in_a_nested_target, _teardown_nested),
     cmocka_unit_test_teardown(test_solo_inside_a_nested_group_keeps_the_path,
                               _teardown_nested),

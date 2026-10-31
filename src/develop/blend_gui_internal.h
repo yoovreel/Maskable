@@ -79,6 +79,9 @@ dt_masks_form_t *dt_masks_gui_module_flexi_group(dt_iop_module_t *module, dt_mas
 dt_masks_point_group_t *dt_masks_gui_group_point(dt_masks_form_t *grp, const dt_mask_id_t id);
 /** remove every shape and reset the panel's scratch state (no confirmation) */
 void dt_masks_gui_reset_mask_core(dt_iop_module_t *module);
+/** remove what group `cid` holds, keeping the group with
+    its settings; the panel forgets the ids it held. Does not commit */
+void dt_masks_gui_empty_group_core(dt_iop_module_t *module, dt_mask_id_t cid);
 /** destroy and rebuild the panel's row tree */
 void dt_masks_gui_build_list(dt_iop_module_t *module);
 /** re-arm on-canvas editing after the mask changed underneath it */
@@ -106,7 +109,7 @@ dt_mask_id_t dt_masks_gui_group_cid_of_form(dt_masks_form_t *grp, const dt_mask_
 dt_mask_id_t dt_masks_model_nest_new_group(dt_masks_form_t *grp,
                                            const dt_masks_state_t flexi_op,
                                            const dt_mask_id_t cid);
-/** "compose": put the element or group of point `pt` (a member, or a group's
+/** "compose": put the member of point `pt` (or a group's
     marker) into a new group folding with `flexi_op`, where it was, on top of
     it a new empty group to fill. The mask's own group cannot move, so its
     members and settings go into a new group instead, and it keeps nothing
@@ -115,6 +118,109 @@ dt_mask_id_t dt_masks_model_nest_new_group(dt_masks_form_t *grp,
 dt_mask_id_t dt_masks_model_compose(dt_masks_form_t *grp,
                                     const dt_masks_point_group_t *pt,
                                     const dt_masks_state_t flexi_op);
+/** the member points the ids `picked` stand for (an element's form id, a
+    group's cid), bottom-up as the mask holds them: a group as the member its
+    holder has for it, and nothing a picked group holds, which goes with it.
+    The mask's own group is no pick. Free the list, not the points */
+GList *dt_masks_model_picked_points(dt_masks_form_t *grp, const GList *picked);
+/** "group together": the member points `pts`, all in the list of one group,
+    go into a new group folding with `flexi_op`, which takes the place of the
+    topmost of them, and they keep their order in it. Returns the new group's
+    id, or INVALID_MASKID where they are not in one list or groups may not
+    nest any deeper */
+dt_mask_id_t dt_masks_model_group_points(dt_masks_form_t *grp,
+                                         const GList *pts,
+                                         const dt_masks_state_t flexi_op);
+/** the member points `pts`, in list order, each dropped onto group `dst` as
+    dt_masks_model_drop_point_onto_group does. Returns how many moved */
+int dt_masks_model_move_points(dt_iop_module_t *module,
+                               dt_masks_form_t *grp,
+                               const GList *pts,
+                               const dt_mask_id_t dst);
+
+/** the multiple selection: members of the mask picked together by
+    shift+click, kept as a list of ids as the rows carry them, an element's
+    form id or a group's cid. The list is NULL or holds two or more: one pick
+    is no multiple selection. A group is picked whole: when its cid is picked,
+    so is everything it holds, at any depth. The functions below keep both
+    invariants */
+
+/** the id a pick of the row of form `fid` is kept under: the cid of a group,
+    which its header carries, where its row names the group by its form id;
+    `fid` itself for an element */
+dt_mask_id_t dt_masks_model_pick_id(const dt_mask_id_t fid);
+
+/** what a shift+click did, for the caller to show */
+typedef enum dt_masks_pick_outcome_t
+{
+  DT_MASKS_PICK_IGNORED, // not a member of the mask, or its own group: nothing
+  DT_MASKS_PICK_CHANGED, // the picks changed: now NULL or two or more
+  DT_MASKS_PICK_CLICK,   // nothing to join: a plain click on the member `id`
+  DT_MASKS_PICK_SELECT,  // the picks are gone: select the member `id` alone
+} dt_masks_pick_outcome_t;
+
+typedef struct dt_masks_pick_result_t
+{
+  dt_masks_pick_outcome_t outcome;
+  dt_mask_id_t id; // the row's form id for CLICK, a pick id for SELECT
+} dt_masks_pick_result_t;
+
+/** the member a first shift+click joins, if the panel selects one: the element
+    `selected_formid`, else the group `selected_cid`, as a pick id. The mask's
+    own group is one, when it is what is selected: the pick is then everything
+    in the mask but what is clicked. INVALID_MASKID where nothing is */
+dt_mask_id_t dt_masks_model_pick_anchor(dt_masks_form_t *grp,
+                                        const dt_mask_id_t selected_formid,
+                                        const dt_mask_id_t selected_cid);
+
+/** shift+click on the row or header of `fid`: pick it, or take it off if it is
+    picked. With no picks yet it joins the panel's selection (see
+    dt_masks_model_pick_anchor), which makes two, or else is a plain click. A group
+    is picked and taken off with all it holds. Taking off what a picked group
+    holds also takes the group off, as it is not whole then. The mask's own
+    group is never a pick. `*picked` is updated */
+dt_masks_pick_result_t dt_masks_model_pick_toggle(dt_masks_form_t *grp,
+                                                  GList **picked,
+                                                  const dt_mask_id_t selected_formid,
+                                                  const dt_mask_id_t selected_cid,
+                                                  const dt_mask_id_t fid);
+/** drop the picks that are not in the mask any more, and the groups that are
+    not picked whole any more, as after one gained a member; and all of them if
+    fewer than two remain */
+void dt_masks_model_picks_prune(dt_masks_form_t *grp, GList **picked);
+/** the form ids the canvas highlights for the picks: each picked element,
+    which are the members of the picked groups too. Free the list */
+GList *dt_masks_model_picks_canvas_ids(dt_masks_form_t *grp, const GList *picked);
+/** the groups, by cid, that every one of the member points `pts` may be moved
+    into, and where they are not all already: the mask's own group included,
+    top-down as the mask holds them. Free the list */
+GList *dt_masks_model_move_targets(dt_masks_form_t *grp, const GList *pts);
+
+/** the flags the buttons of a row act on */
+typedef enum dt_masks_pick_flag_t
+{
+  DT_MASKS_PICK_FLAG_DISABLE, // the eye: a member's disable, a group's bypass
+  DT_MASKS_PICK_FLAG_INVERT,  // the invert button: a member's, a group's output
+} dt_masks_pick_flag_t;
+
+/** the button `flag` of the row or header of the pick `clicked` was clicked:
+    every pick takes the state the click gives that one, but for what a picked
+    group holds, which the group's state covers. FALSE, and nothing done, if
+    `clicked` is not picked, or is held by a picked group: it is acted on alone.
+    `*groups` is set if a group was among the picks, whose rows change shape
+    and not only state */
+gboolean dt_masks_model_picks_toggle_flag(dt_masks_form_t *grp,
+                                          const GList *picked,
+                                          const dt_mask_id_t clicked,
+                                          const dt_masks_pick_flag_t flag,
+                                          gboolean *groups);
+/** the group `clicked` has its operator set to `flexi_op`: so does every
+    picked group, but for those held by a picked group. FALSE, and nothing
+    done, if `clicked` is not picked, or is held by a picked group */
+gboolean dt_masks_model_picks_set_op(dt_masks_form_t *grp,
+                                     const GList *picked,
+                                     const dt_mask_id_t clicked,
+                                     const dt_masks_state_t flexi_op);
 /** the reverse for the mask's own group: when it applies nothing and holds
     one plain nested group, that group's members and settings become its own.
     `whole` is the module's refinement, which takes the group's. FALSE where
@@ -123,18 +229,52 @@ gboolean dt_masks_model_hoist_sole_group(dt_masks_form_t *grp, dt_masks_refineme
 /** remove the members of group `cid`, keeping the group. Returns their ids,
     which the caller frees */
 GList *dt_masks_model_empty_group(dt_masks_form_t *grp, const dt_mask_id_t cid);
+/** does `list`, a group form, hold an element at any depth, rather than only
+    groups? A member naming no form counts too */
+gboolean dt_masks_model_group_has_elements(dt_masks_form_t *list);
+
+/** one group of a group layout, as the layout presets store it (see
+    masks_gui_presets.c). Written to the database verbatim, as one blob of
+    these, so every field is fixed-size */
+typedef struct dt_masks_layout_node_t
+{
+  // flexi operator bits (DT_MASKS_STATE_FLEXI_OP)
+  dt_masks_state_t flexi_op;
+  float opacity;
+  // same width as dt_masks_point_group_t.name, the group's marker's name.
+  // Unused for the mask's own group, which is always "whole mask"
+  char name[128];
+  // index of the holding group's node, -1 for the mask's own group
+  int32_t parent;
+} dt_masks_layout_node_t;
+
+/** set the group whose marker is `head`, in the mask `grp`, to the layout's
+    first node and nest the layout's other groups in it, each given its note
+    key from `keys` (NULL for none), without committing. Not the group's name:
+    the mask's own group has none, and a group a layout is applied within keeps
+    its own. With `keep_head`, not its settings either: only the nested groups
+    are added, a merge. Returns the bottom nested group, or INVALID_MASKID when
+    the layout nests none. *skipped, when given, counts the groups that would
+    nest deeper than DT_MASKS_NESTING_MAX */
+dt_mask_id_t dt_masks_model_layout_build_at(dt_masks_form_t *grp,
+                                            dt_masks_point_group_t *head,
+                                            const dt_masks_layout_node_t *nodes,
+                                            const int n,
+                                            const gchar *const *keys,
+                                            const gboolean keep_head,
+                                            int *skipped);
 
 // what the gestures do, apart from their GTK handlers so that the tests run
 // the same code. They change the mask structure and the panel's selection,
 // not history, the pipe or the widgets: the handler commits (see
-// dt_masks_model_drop_element_onto_element in blend_gui.c)
+// dt_masks_model_drop_member_onto_member in blend_gui.c)
 
-/** move element `src` into `dst`'s group, landing above or below it */
-gboolean dt_masks_model_drop_element_onto_element(dt_iop_module_t *module,
-                                                  dt_masks_form_t *grp,
-                                                  const dt_mask_id_t src,
-                                                  const dt_mask_id_t dst,
-                                                  const gboolean above);
+/** move member `src` into `dst`'s group, landing above or below it */
+gboolean dt_masks_model_drop_member_onto_member(dt_iop_module_t *module,
+                                                dt_masks_form_t *grp,
+                                                const dt_mask_id_t src,
+                                                const dt_mask_id_t dst,
+                                                const gboolean above);
 /** the same for the references `sp` and `dp` themselves, where the mask holds
     either shape twice and the form id alone names the first reference */
 gboolean dt_masks_model_drop_point_onto_point(dt_iop_module_t *module,
@@ -160,12 +300,12 @@ dt_masks_panel_sel_t dt_masks_model_click_element(const dt_iop_gui_blend_data_t 
 dt_masks_panel_sel_t dt_masks_model_click_group(const dt_iop_gui_blend_data_t *bd,
                                                 const dt_mask_id_t cid);
 
-/** move element `src` into the group `dst` is in (`dst` a member or the
+/** move member `src` into the group `dst` is in (`dst` a member or the
     group's marker), landing on top of it */
-gboolean dt_masks_model_drop_element_onto_group(dt_iop_module_t *module,
-                                                dt_masks_form_t *grp,
-                                                const dt_mask_id_t src,
-                                                const dt_mask_id_t dst);
+gboolean dt_masks_model_drop_member_onto_group(dt_iop_module_t *module,
+                                               dt_masks_form_t *grp,
+                                               const dt_mask_id_t src,
+                                               const dt_mask_id_t dst);
 /** the same for the reference `sp` itself (see dt_masks_model_drop_point_onto_point) */
 gboolean dt_masks_model_drop_point_onto_group(dt_iop_module_t *module,
                                               dt_masks_form_t *grp,
@@ -173,12 +313,6 @@ gboolean dt_masks_model_drop_point_onto_group(dt_iop_module_t *module,
                                               const dt_mask_id_t dst);
 /** drop every member whose form is gone from dev->forms; how many went */
 int dt_masks_model_prune_dangling_members(dt_masks_form_t *grp);
-/** move a whole same-kind cluster onto an element row or a group header */
-gboolean dt_masks_gui_cluster_move(dt_iop_module_t *module,
-                                   GList *member_ids,
-                                   const dt_mask_id_t dst,
-                                   const gboolean dst_is_group,
-                                   const gboolean above);
 /** the nested group form whose marker is `cid`, or NULL: for the mask's own
     group, and for what is no group's marker */
 dt_masks_form_t *dt_masks_model_nested_group_of(dt_masks_form_t *grp, const dt_mask_id_t cid);
@@ -214,56 +348,47 @@ dt_masks_solo_canvas_t dt_masks_model_toggle_soloedit(dt_iop_module_t *module,
                                                       dt_masks_form_t *grp,
                                                       const dt_mask_id_t id);
 
-/** does an element row of this kind carry an expander chevron of its own?
-    Every element has at least its opacity slider to show. `props_subpanel` is
-    "element properties in subpanel", which leaves only a parametric row's
-    in/out chevron. */
-gboolean dt_masks_model_row_is_expandable(const dt_masks_type_t type,
-                                          const gboolean props_subpanel);
-
-/** which element "auto-expand selected" keeps open: the selection if it can be
-    expanded at all, else whatever was expanded last. Resolves the form's kind
-    through darktable.develop. */
-dt_mask_id_t dt_masks_model_auto_expand_anchor(const dt_iop_gui_blend_data_t *bd);
-
-/** what a real click on an element row's chevron does to "auto-expand
-    selected": the row to collapse (INVALID_MASKID for none) and the element
-    the option considers open afterwards. */
-typedef struct dt_masks_chevron_click_t
-{
-  dt_mask_id_t collapse;
-  dt_mask_id_t last_expanded;
-} dt_masks_chevron_click_t;
-
-dt_masks_chevron_click_t dt_masks_model_element_chevron_click(const dt_iop_gui_blend_data_t *bd,
-                                                              const dt_mask_id_t id,
-                                                              const gboolean expanded,
-                                                              const gboolean auto_expand);
-/** the same, one level up: which group it keeps open. Every group can be
-    expanded, so this needs no kind test. */
-dt_mask_id_t dt_masks_model_auto_expand_group_anchor(const dt_iop_gui_blend_data_t *bd);
-
 /** has the user touched this channel's input (0) / output (1) sub-range? */
 gboolean dt_masks_gui_param_channel_is_used(const dt_masks_point_parametric_t *p,
                                             const dt_iop_gui_blendif_channel_t *channel,
                                             const int in_out);
 
+/** the sliders a row shows for `view`: AUTO resolves to both when the output
+    range is in use, else to the input one; the input one stays so, and the
+    output one, once a choice of its own, is both */
+dt_masks_param_view_t dt_masks_model_param_view_resolve(const dt_masks_param_view_t view,
+                                                        const gboolean out_used);
+
+/** what a parametric row's swatch shows of one channel's range, `r` its four
+    markers in [0, 1] (zero opacity, full opacity, full opacity, zero opacity).
+    The swatch is the colors the element selects, not the whole range: the span
+    below, laid end to end across its width. Normal, that is the one stretch
+    where the range has any opacity, [r0, r3]; inverted, the two outside it,
+    [0, r1] and [r2, 1], of which an empty one is left out. */
+typedef struct dt_masks_swatch_span_t
+{
+  int n;
+  float from[2];
+  float to[2];
+} dt_masks_swatch_span_t;
+
+dt_masks_swatch_span_t dt_masks_model_param_swatch_span(const float r[4], gboolean inverted);
+/** how much of the channel value `v` the element selects: the range's opacity
+    there, or what is left of it inverted. The edges of the range fade, as the
+    markers say */
+float dt_masks_model_param_swatch_alpha(const float r[4], gboolean inverted, float v);
 /** which controls a parametric row shows */
 typedef struct dt_masks_param_vis_t
 {
   gboolean input;
   gboolean output;
   gboolean boost;
-  gboolean bypass;
-  /** the full opacity slider leading the expanded controls */
-  gboolean opacity;
 } dt_masks_param_vis_t;
 
-dt_masks_param_vis_t dt_masks_model_param_row_visibility(const gboolean expanded,
-                                                         const gboolean in_used,
+dt_masks_param_vis_t dt_masks_model_param_row_visibility(const dt_masks_param_view_t view,
                                                          const gboolean out_used,
                                                          const gboolean boost_enabled,
-                                                         const gboolean props_subpanel);
+                                                         const gboolean boost_with_sliders);
 
 /** state transition decisions for the mask panel and corner icon */
 typedef struct dt_masks_panel_state_t
@@ -279,7 +404,25 @@ dt_masks_panel_state_t dt_masks_model_panel_state(const int pos,
                                                   const gboolean has_masking,
                                                   const gboolean is_expanded,
                                                   const gboolean mask_active,
-                                                  const gboolean panel_pref_collapsed);
+                                                  const gboolean panel_pref_collapsed,
+                                                  const gboolean always_on);
+
+/** whether the canvas panel is taken off the screen. The user's fold always
+    does it. An always-on panel is also part of the side panel it is docked
+    next to, and of the darkroom: it goes with them unless the user opened it
+    themselves (user_action) or a collapse-all is being undone (keep_shown) */
+gboolean dt_masks_model_canvas_panel_hidden(gboolean folded,
+                                            gboolean user_action,
+                                            gboolean always_on,
+                                            gboolean in_view,
+                                            gboolean side_visible,
+                                            gboolean keep_shown);
+/** undoing a collapse-all gives back an always-on panel that was on screen
+    before it, whatever its side panel's state: the key press takes everything
+    away and the next one restores what was there */
+gboolean dt_masks_model_tab_keeps_panel(gboolean always_on,
+                                        gboolean in_view,
+                                        gboolean shown_before_tab);
 
 gboolean dt_masks_model_pin_should_expand_iop(const gboolean is_expanded,
                                               const gboolean is_collapsed);
@@ -287,39 +430,50 @@ gboolean dt_masks_model_pin_should_expand_iop(const gboolean is_expanded,
 /** the shape solo-edit mode should be isolating, given the panel's selection,
     or INVALID_MASKID if the mode must stand down */
 dt_mask_id_t dt_masks_model_soloedit_target(dt_iop_gui_blend_data_t *bd);
-/** what the "element properties in subpanel" section shows, and whose */
-typedef struct dt_masks_props_target_t
+/** whose controls are shown, and what they are */
+typedef struct dt_masks_controls_target_t
 {
   /** the selected element, or else the selected group; INVALID_MASKID when
-      it has nothing to show there */
+      it has nothing to show */
   dt_mask_id_t id;
   gboolean is_group;
   /** a drawn shape's size, feather and the rest */
   gboolean shape;
-  /** a full opacity slider: always, for anything selected */
+  /** a parametric element's sliders and opacity */
+  gboolean param;
+  /** there are controls to show: a full opacity slider at least, for anything
+      selected */
   gboolean opacity;
-  /** a parametric channel's boost factor, for a channel that has one */
-  gboolean boost;
-} dt_masks_props_target_t;
+} dt_masks_controls_target_t;
 
-dt_masks_props_target_t dt_masks_model_props_panel_target(const dt_iop_gui_blend_data_t *bd);
+dt_masks_controls_target_t dt_masks_model_controls_target(const dt_iop_gui_blend_data_t *bd,
+                                                          const gboolean hover);
 
 /** the collapsible sections of the mask panel below the list. Each keeps one
     folded state, the same for every module and target */
 typedef enum dt_masks_section_t
 {
   DT_MASKS_SECTION_REFINE,
-  DT_MASKS_SECTION_PROPS,
+  DT_MASKS_SECTION_CONTROLS,
+  DT_MASKS_SECTION_HELP,
   DT_MASKS_SECTION_CONSUMERS,
   DT_MASKS_SECTION_COUNT
 } dt_masks_section_t;
 
-/** whether a section shows unfolded: its saved state, except that the
-    properties section opens while it holds the creation controls of a shape
-    being drawn, without that being saved */
-gboolean dt_masks_model_section_expanded(const dt_masks_section_t section, const gboolean drawing);
+/** whether a section shows unfolded: its saved state. Not for the controls
+    section, whose state depends on the member (see
+    dt_masks_model_controls_expanded) */
+gboolean dt_masks_model_section_expanded(const dt_masks_section_t section);
 /** save a section's folded state, as a click on its toggle does */
 void dt_masks_model_section_save(const dt_masks_section_t section, const gboolean expanded);
+
+/** whether the controls subpanel shows unfolded for a kind of member: its
+    saved state, except that it opens while it holds the creation controls of a
+    shape being drawn, without that being saved. Each kind has a state of its
+    own, the same for every module and target */
+gboolean dt_masks_model_controls_expanded(const dt_masks_controls_kind_t kind, const gboolean drawing);
+/** save the folded state of a kind of member, as a click on the subpanel's toggle does */
+void dt_masks_model_controls_save(const dt_masks_controls_kind_t kind, const gboolean expanded);
 
 /** geometry for dt_masks_model_whisker_popup_rect, all in root (screen) coordinates */
 typedef struct dt_masks_whisker_geom_t
@@ -379,7 +533,7 @@ gboolean dt_masks_model_form_is_linked(const dt_masks_form_t *form);
 /** point the refinement scope at what the panel selection names: the
     element, its group, a staged group, or the whole mask */
 void dt_masks_model_refine_scope_from_selection(dt_iop_module_t *module);
-/** forget a refinement scope whose element or group left the mask, with the
+/** forget a refinement scope whose member left the mask, with the
     selections naming it. TRUE when the scope must be derived again */
 gboolean dt_masks_model_refine_scope_prune(dt_iop_module_t *module);
 /** everything the element list is built from; an unchanged one skips the rebuild */
@@ -406,33 +560,42 @@ void dt_masks_gui_prune_stale_solo(dt_iop_module_t *module);
 // masks_gui_presets.c -> blend_gui.c
 // ---------------------------------------------------------------------------
 
-/** append the "group layout presets" section to an existing menu */
-void dt_masks_gui_add_presets_menu(GMenu *menu, GtkWidget *anchor, dt_iop_module_t *module);
+/** a section title between two rules, as the presets popover and the context
+    menus draw theirs, for a popover of the menu look */
+GtkWidget *dt_masks_gui_menu_section(const gchar *text);
+/** the popover of the selection's presets button: the group layout presets,
+    each with the buttons that apply it, and saving one. Not yet shown */
+GtkWidget *dt_masks_gui_presets_popover(GtkWidget *anchor, dt_iop_module_t *module);
 /** a preset group's note pages, untranslated, from its
     dt_masks_point_group_t.preset_note key; NULL when the key names none. Owned
     by the preset cache: valid until the presets file is next read */
 GPtrArray *dt_masks_gui_preset_notes(const char *key);
-/** the "show preset notes" option */
+/** the "show preset help notes (beginners)" option */
 gboolean dt_masks_gui_preset_notes_shown(void);
 /** give a mask that has no group form yet the default group layout; with
     `wipe`, replace any mask with it ("reset mask") */
 void dt_masks_gui_apply_default_preset(dt_iop_module_t *module, gboolean wipe);
-/** append the "default group layout" section to the panel options popover */
+/** build the default group layout into `grp`, a mask's own group just
+    created, without committing (see dt_masks_gui_module_flexi_group) */
+void dt_masks_gui_default_layout_build(dt_masks_form_t *grp);
+/** set `root`, the marker standing for a mask with no group form yet, as the
+    default group layout's own group would be: its operator, opacity and note */
+void dt_masks_gui_default_layout_root(dt_masks_point_group_t *root);
+/** append the default group layout choice to the panel options popover */
 void dt_masks_gui_add_default_preset_box(GtkWidget *box);
 
 // ---------------------------------------------------------------------------
 // masks_gui_toolbar.c -> blend_gui.c
 // ---------------------------------------------------------------------------
 
-/** the add-buttons toolbar: add group, shapes, parametric channels and
-    import, centered on one line when they fit and on two or three rows
-    otherwise, presets at the top right. gap is an empty widget whose width
-    spaces them */
+/** the add-buttons toolbar: add group, import, shapes and parametric channels,
+    on one line when they fit and on two or three rows otherwise. In every row
+    add group and import keep to the left edge, and the rest is against the
+    right one. gap is an empty widget whose width spaces them */
 GtkWidget *dt_masks_gui_toolbar_new(GtkWidget *group,
+                                    GtkWidget *import,
                                     GtkWidget *shapes,
                                     GtkWidget *channels,
-                                    GtkWidget *import,
-                                    GtkWidget *presets,
                                     GtkWidget *gap);
 
 // ---------------------------------------------------------------------------
@@ -441,6 +604,10 @@ GtkWidget *dt_masks_gui_toolbar_new(GtkWidget *group,
 
 /** a section title in the panel options popover; `tip` may be NULL */
 void dt_masks_gui_pref_section(GtkWidget *box, const gchar *title, const gchar *tip);
+/** a combo box in the panel options popover, for an exclusive choice, with its
+    `label` on the left; the caller adds the entries and connects
+    "value-changed" once the initial one is set */
+GtkWidget *dt_masks_gui_pref_combo(GtkWidget *box, const gchar *label, const gchar *tip);
 /** re-home a widget into a new parent (no-op if already there), keeping its
     shown state */
 void dt_masks_gui_reparent_into(GtkWidget *w, GtkWidget *parent,
@@ -448,6 +615,9 @@ void dt_masks_gui_reparent_into(GtkWidget *w, GtkWidget *parent,
 /** the visibility and sensitivity of the mask header's buttons, from the
     mask's and the module's state */
 void dt_iop_gui_blend_mask_header_sync(dt_iop_gui_blend_data_t *data);
+/** the focus row under the mask header: name the module (and its instance)
+    whose mask the panel shows, and show the row when `show` */
+void dt_masks_gui_focus_row_sync(dt_iop_gui_blend_data_t *bd, const gboolean show);
 /** the classes and alignment of the mask header's on/off toggle, and of the
     utility lib's stand-in for it */
 void dt_masks_gui_header_toggle_style(GtkWidget *toggle);
@@ -466,10 +636,24 @@ void dt_masks_gui_flexi_release(dt_iop_module_t *module);
 void dt_masks_gui_flexi_inline_collapse_clicked(GtkWidget *w, gpointer user_data);
 // the position preference (MASKS_PANEL_POS_*)
 int dt_masks_gui_panel_position(void);
+// the canvas panel is always-on: always on screen unless the user folds it, in a
+// column of its own beside the canvas. Only the canvas position has the choice
+gboolean dt_masks_gui_panel_always_on(void);
+// the lib hosting the panel in the utility position: it is shown or hidden by
+// the position preference alone, so the modules list must not offer it
+gboolean dt_masks_gui_is_host_lib(const struct dt_lib_module_t *module);
 // which edge the canvas-side panel is docked against, and where pinning it
 // records that -- not part of the position choice (see MASKS_PANEL_POS_CANVAS)
 gboolean dt_masks_gui_panel_side_right(void);
-/** append the "blend mask panel position" section to an existing menu */
+/** which of the panel options popover's dependent checks apply: the canvas
+    panel's always-on choice and resize handle under the position choice, the
+    focus row under it
+    (a hosted position's). The popover builds and updates them from these alone */
+gboolean dt_masks_gui_pref_always_on_applies(int position);
+gboolean dt_masks_gui_pref_handle_applies(int position);
+gboolean dt_masks_gui_pref_focus_row_applies(int position);
+/** append the panel position choice, and the options that depend on it, to the
+    panel options popover */
 void dt_masks_gui_add_panel_position_box(GtkWidget *box, dt_iop_module_t *module);
 
 G_END_DECLS

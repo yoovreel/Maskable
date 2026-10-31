@@ -1047,6 +1047,30 @@ void dtgtk_cairo_paint_masks_used(cairo_t *cr, const gint x, const gint y, const
   FINISH
 }
 
+void dtgtk_cairo_paint_module_focus(cairo_t *cr, const gint x, const gint y, const gint w, const gint h, gint flags, void *data)
+{
+  PREAMBLE(0.9, 1, 0, 0)
+
+  // a viewfinder: four corner brackets around a dot
+  for(int i = 0; i < 4; i++)
+  {
+    cairo_save(cr);
+    cairo_translate(cr, 0.5, 0.5);
+    cairo_rotate(cr, i * M_PI_2);
+    cairo_translate(cr, -0.5, -0.5);
+    cairo_move_to(cr, 0.08, 0.34);
+    cairo_line_to(cr, 0.08, 0.08);
+    cairo_line_to(cr, 0.34, 0.08);
+    cairo_restore(cr);
+  }
+  cairo_stroke(cr);
+
+  cairo_arc(cr, 0.5, 0.5, 0.15, 0, 2.0 * M_PI);
+  cairo_fill(cr);
+
+  FINISH
+}
+
 void dtgtk_cairo_paint_masks_panel(cairo_t *cr, const gint x, const gint y, const gint w, const gint h, gint flags, void *data)
 {
   PREAMBLE(0.9, 1, 0, 0)
@@ -1982,6 +2006,31 @@ void dtgtk_cairo_paint_remove(cairo_t *cr, const gint x, const gint y, const gin
   FINISH
 }
 
+void dtgtk_cairo_paint_trash(cairo_t *cr, const gint x, const gint y, const gint w, const gint h, gint flags, void *data)
+{
+  PREAMBLE(0.95, 1, 0, 0)
+
+  // the lid and its handle
+  cairo_move_to(cr, 0.1, 0.22);
+  cairo_line_to(cr, 0.9, 0.22);
+  cairo_move_to(cr, 0.38, 0.22);
+  cairo_line_to(cr, 0.38, 0.08);
+  cairo_line_to(cr, 0.62, 0.08);
+  cairo_line_to(cr, 0.62, 0.22);
+  // the bin, narrower at the bottom, and its two ribs
+  cairo_move_to(cr, 0.2, 0.22);
+  cairo_line_to(cr, 0.27, 0.92);
+  cairo_line_to(cr, 0.73, 0.92);
+  cairo_line_to(cr, 0.8, 0.22);
+  cairo_move_to(cr, 0.42, 0.4);
+  cairo_line_to(cr, 0.42, 0.75);
+  cairo_move_to(cr, 0.58, 0.4);
+  cairo_line_to(cr, 0.58, 0.75);
+  cairo_stroke(cr);
+
+  FINISH
+}
+
 void dtgtk_cairo_paint_star(cairo_t *cr, const gint x, const gint y, const gint w, const gint h, gint flags, void *data)
 {
   PREAMBLE(1, 1, 0, 0)
@@ -2911,6 +2960,36 @@ void dtgtk_cairo_paint_zoom(cairo_t *cr, const gint x, const gint y, const gint 
 
   // lens
   cairo_arc(cr, 0.35, 1.0 - 0.65, 0.3, -M_PI, M_PI);
+  cairo_stroke(cr);
+
+  FINISH
+}
+
+static void _workspace_card(cairo_t *cr, double x, double y, double s)
+{
+  const double r = 0.1;
+  cairo_new_sub_path(cr);
+  cairo_arc(cr, x + s - r, y + r,     r, -M_PI_2, 0.0);
+  cairo_arc(cr, x + s - r, y + s - r, r, 0.0, M_PI_2);
+  cairo_arc(cr, x + r,     y + s - r, r, M_PI_2, M_PI);
+  cairo_arc(cr, x + r,     y + r,     r, M_PI, 1.5 * M_PI);
+  cairo_close_path(cr);
+}
+
+void dtgtk_cairo_paint_workspace(cairo_t *cr, const gint x, const gint y, const gint w, const gint h, gint flags, void *data)
+{
+  PREAMBLE(1, 1, 0, 0)
+
+  cairo_save(cr);
+  cairo_rectangle(cr, 0.0, 0.0, 1.0, 1.0);
+  _workspace_card(cr, 0.34, 0.34, 0.64);
+  cairo_set_fill_rule(cr, CAIRO_FILL_RULE_EVEN_ODD);
+  cairo_clip(cr);
+  _workspace_card(cr, 0.02, 0.02, 0.64);
+  cairo_stroke(cr);
+  cairo_restore(cr);
+
+  _workspace_card(cr, 0.34, 0.34, 0.64);
   cairo_stroke(cr);
 
   FINISH
