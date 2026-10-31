@@ -281,6 +281,65 @@ static void _delete_clicked(GtkButton *button, dt_lib_module_t *self)
   g_list_free(members);
 }
 
+static void _rename_clicked(GtkWidget *button, dt_lib_module_t *self)
+{
+  dt_iop_module_t *m = g_object_get_data(G_OBJECT(button), "module");
+  dt_develop_t *dev = darktable.develop;
+  if(!m || !dev || !g_list_find(dev->iop, m)) return;
+  GList *members = _mask_members(m);
+  gchar *key = _mask_key(m);
+
+  GtkWidget *win = dt_ui_main_window(darktable.gui->ui);
+  GtkWidget *dlg = gtk_dialog_new_with_buttons(_("rename mask"), GTK_WINDOW(win),
+                                               GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                               _("cancel"), GTK_RESPONSE_CANCEL,
+                                               _("rename"), GTK_RESPONSE_ACCEPT, NULL);
+  gtk_dialog_set_default_response(GTK_DIALOG(dlg), GTK_RESPONSE_ACCEPT);
+  GtkWidget *entry = gtk_entry_new();
+  gtk_entry_set_text(GTK_ENTRY(entry), key ? key : m->name());
+  gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
+  gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dlg))), entry, TRUE, TRUE, 6);
+  gtk_widget_show_all(dlg);
+
+  if(gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT)
+  {
+    gchar *name = g_strstrip(g_strdup(gtk_entry_get_text(GTK_ENTRY(entry))));
+    if(!name[0] || !g_strcmp0(name, key))
+    {
+      // nothing to change
+    }
+    else
+    {
+      // two masks may not share a name: the name is what ties a mask to its adjustments
+      gboolean taken = FALSE;
+      for(const GList *l = dev->iop; l && !taken; l = g_list_next(l))
+      {
+        const dt_iop_module_t *o = l->data;
+        if(g_list_find(members, o)) continue;
+        gchar *k = _mask_key(o);
+        taken = !g_strcmp0(k, name);
+        g_free(k);
+      }
+      if(taken)
+        dt_control_log(_("another mask already has that name"));
+      else
+        for(GList *l = members; l; l = g_list_next(l))
+          dt_iop_update_multi_name((dt_iop_module_t *)l->data, name, TRUE, TRUE, TRUE);
+    }
+    g_free(name);
+  }
+  gtk_widget_destroy(dlg);
+  g_free(key);
+  g_list_free(members);
+}
+
+static gboolean _title_pressed(GtkWidget *w, GdkEventButton *e, dt_lib_module_t *self)
+{
+  if(e->type != GDK_2BUTTON_PRESS || e->button != 1) return FALSE;
+  _rename_clicked(w, self);
+  return TRUE;
+}
+
 static void _fill(dt_lib_module_t *self)
 {
   dt_lib_mask_layers_t *d = self->data;
@@ -331,6 +390,7 @@ static void _fill(dt_lib_module_t *self)
     gtk_widget_set_tooltip_text(btn, _("select this mask: its adjustments, parts and sliders"));
     g_object_set_data(G_OBJECT(btn), "module", anchor);
     g_signal_connect(btn, "clicked", G_CALLBACK(_row_clicked), self);
+    g_signal_connect(btn, "button-press-event", G_CALLBACK(_title_pressed), self);
     if(active) dt_gui_add_class(row, "dt_mask_layer_active");
 
     // a swatch for the mask, in the overlay's color
@@ -389,6 +449,12 @@ static void _fill(dt_lib_module_t *self)
       g_signal_connect(del, "clicked", G_CALLBACK(_delete_clicked), self);
       gtk_box_pack_start(GTK_BOX(card), del, FALSE, FALSE, 4);
 
+      GtkWidget *ren = gtk_button_new_with_label(_("rename mask"));
+      dt_gui_add_class(ren, "dt_mask_mode");
+      gtk_widget_set_tooltip_text(ren, _("rename this mask and its adjustments (double-click the name works too)"));
+      g_object_set_data(G_OBJECT(ren), "module", anchor);
+      g_signal_connect(ren, "clicked", G_CALLBACK(_rename_clicked), self);
+      gtk_box_pack_start(GTK_BOX(card), ren, FALSE, FALSE, 4);
     }
     gtk_box_pack_start(GTK_BOX(d->list), card, FALSE, FALSE, 0);
     g_list_free(members);
