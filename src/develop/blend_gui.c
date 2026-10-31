@@ -1417,7 +1417,6 @@ static const char *_masks_use_in_ops[] = {
   "toneequal",        // highlights, shadows, whites, blacks
   "contrastntexture", // texture, clarity
   "bilat",            // local contrast
-  "hazeremoval",      // dehaze
   "channelmixerrgb",  // temperature, tint
   "colorbalancergb",  // saturation, vibrance, color grading
   "colorequal",       // hue, saturation, brightness per color
@@ -1581,7 +1580,6 @@ static const _masks_adjust_t _masks_adjusts[] = {
   { N_("blacks"),     "colorbalancergb",  "global_Y",          -100.f, 100.f, 0.001f, 0, "" },
   { N_("texture"),    "contrastntexture", "gain_fine",         -100.f, 100.f, 0.01f,  0, "" },
   { N_("clarity"),    "contrastntexture", "gain_medium",       -100.f, 100.f, 0.01f,  0, "" },
-  { N_("dehaze"),     "hazeremoval",      "strength",          -100.f, 100.f, 0.01f,  0, "" },
   { N_("saturation"), "colorbalancergb",  "saturation_global", -100.f, 100.f, 0.01f,  0, "" },
   { N_("sharpness"),  "sharpen",          "amount",               0.f, 100.f, 0.02f,  0, "" },
 };
