@@ -1,3 +1,22 @@
+# Maskable
+
+**Maskable is a fork of [darktable](https://www.darktable.org/)** that makes masked edits faster and simpler, in the way many Lightroom users expect:
+
+- **One card per mask** in the masks list: its shapes, its adjustments, and a one-click "delete mask" that also removes its adjustments.
+- **Mask adjustment panel** (right column): quick sliders for the selected mask (temp, tint, exposure, contrast, highlights, shadows, blacks, texture, clarity, saturation, sharpness). Moving a slider adds a normal darktable module instance that follows the mask and is named after it; putting the slider back to 0 removes that instance again.
+- **AI remove** as a module of its own (LaMa inpainting), with a brush.
+- Kept in step with upstream darktable's current development branch, including its new masks panel.
+
+This is a development build: **back up your library and your XMP files first.** Edits are stored the normal darktable way, but a library opened with this build may no longer open in an older darktable.
+
+**Download (macOS, Apple silicon):** the `.dmg` on the [latest release](../../releases/tag/lr-masks-latest). The app is not signed: right-click it and choose *Open* the first time.
+
+**Feedback:** please open an issue and say what you did, what you expected, and what happened.
+
+Maskable is not affiliated with the darktable project or with Adobe. darktable is free software under the GPL-3.0 (see `LICENSE`); this fork is released under the same license, and all credit for the underlying application belongs to the darktable developers. Everything below is darktable's own README.
+
+---
+
 [![icon](/data/pixmaps/idbutton.png?raw=true)](https://www.darktable.org/) darktable [![GitHub Workflow Status (branch)](https://img.shields.io/github/actions/workflow/status/darktable-org/darktable/ci.yml?branch=master)](https://github.com/darktable-org/darktable/actions/workflows/ci.yml?query=branch%3Amaster+is%3Acompleted+event%3Apush) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/470/badge)](https://bestpractices.coreinfrastructure.org/projects/470)
 =========
 
