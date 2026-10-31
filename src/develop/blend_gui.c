@@ -1694,7 +1694,7 @@ static void _masks_adjust_changed(GtkWidget *slider, dt_iop_module_t *src)
   if(!m)
   {
     if(v == 0.0f) return;
-    if(!_mask_has_elements(dt_masks_gui_module_mask_group(src)))
+    if(!dt_masks_model_group_has_elements(dt_masks_gui_module_mask_group(src)))
     {
       dt_control_log(_("add an AI object, shape or range to this mask first"));
       return;
@@ -1898,7 +1898,7 @@ gboolean dt_iop_gui_blend_mask_add_part(dt_iop_module_t *module, const int shape
   dt_mask_id_t target = INVALID_MASKID;
   if(subtract)
   {
-    if(!_mask_has_elements(grp))
+    if(!dt_masks_model_group_has_elements(grp))
     {
       dt_control_log(_("add something to the mask first, then subtract from it"));
       return FALSE;
@@ -1927,7 +1927,7 @@ void dt_iop_gui_blend_mask_invert(dt_iop_module_t *module)
 {
   dt_mask_id_t rootcid = INVALID_MASKID;
   dt_masks_form_t *grp = module ? dt_masks_gui_module_flexi_group(module, &rootcid) : NULL;
-  if(!grp || !_mask_has_elements(grp))
+  if(!grp || !dt_masks_model_group_has_elements(grp))
   {
     dt_control_log(_("the mask is empty: nothing to invert yet"));
     return;
@@ -2005,7 +2005,7 @@ dt_iop_module_t *dt_iop_gui_blend_new_mask_adjustment(void)
     int k = 0;
     if(!strcmp(m->op, "exposure") && m->blend_data
        && sscanf(m->multi_name, "mask %d", &k) == 1
-       && !_mask_has_elements(dt_masks_gui_module_mask_group(m)))
+       && !dt_masks_model_group_has_elements(dt_masks_gui_module_mask_group(m)))
     {
       dt_dev_modulegroups_switch(dev, m);
       dt_iop_request_focus(m);
@@ -2051,7 +2051,7 @@ static void _masks_use_in_btn_pressed(GtkGestureSingle *gesture,
   GtkWidget *btn = dt_gui_get_widget(gesture);
   dt_iop_request_focus(module);
 
-  if(!_mask_has_elements(dt_masks_gui_module_mask_group(module)))
+  if(!dt_masks_model_group_has_elements(dt_masks_gui_module_mask_group(module)))
   {
     dt_control_log(_("add an AI object, shape or range to this mask first"));
     return;
