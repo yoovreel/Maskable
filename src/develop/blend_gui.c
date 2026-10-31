@@ -1580,19 +1580,22 @@ typedef struct _masks_adjust_t
   const char *unit;
 } _masks_adjust_t;
 
-#define _ADJ_TEMP 0
-#define _ADJ_TINT 1
+// grouped as the panel shows them: light (0-4), color (5-7), detail (8-10)
+#define _ADJ_TEMP 5
+#define _ADJ_TINT 6
+#define _ADJ_COLOR_FIRST 5
+#define _ADJ_DETAIL_FIRST 8
 static const _masks_adjust_t _masks_adjusts[] = {
-  { N_("temp"),       "colorbalancergb",  NULL,                -100.f, 100.f, 0.f,    0, "" },
-  { N_("tint"),       "colorbalancergb",  NULL,                -100.f, 100.f, 0.f,    0, "" },
   { N_("exposure"),   "exposure",         "exposure",            -3.f,   3.f, 1.f,    2, " EV" },
   { N_("contrast"),   "colorbalancergb",  "contrast",          -100.f, 100.f, 0.01f,  0, "" },
   { N_("highlights"), "colorbalancergb",  "highlights_Y",      -100.f, 100.f, 0.01f,  0, "" },
   { N_("shadows"),    "colorbalancergb",  "shadows_Y",         -100.f, 100.f, 0.01f,  0, "" },
   { N_("blacks"),     "colorbalancergb",  "global_Y",          -100.f, 100.f, 0.001f, 0, "" },
+  { N_("temp"),       "colorbalancergb",  NULL,                -100.f, 100.f, 0.f,    0, "" },
+  { N_("tint"),       "colorbalancergb",  NULL,                -100.f, 100.f, 0.f,    0, "" },
+  { N_("saturation"), "colorbalancergb",  "saturation_global", -100.f, 100.f, 0.01f,  0, "" },
   { N_("texture"),    "contrastntexture", "gain_fine",         -100.f, 100.f, 0.01f,  0, "" },
   { N_("clarity"),    "contrastntexture", "gain_medium",       -100.f, 100.f, 0.01f,  0, "" },
-  { N_("saturation"), "colorbalancergb",  "saturation_global", -100.f, 100.f, 0.01f,  0, "" },
   { N_("sharpness"),  "sharpen",          "amount",               0.f, 100.f, 0.02f,  0, "" },
 };
 #define _N_ADJUSTS G_N_ELEMENTS(_masks_adjusts)
@@ -1820,9 +1823,30 @@ static GtkWidget *_masks_adjust_box_new(dt_iop_module_t *module)
   gtk_box_pack_end(GTK_BOX(head), reset, FALSE, FALSE, 0);
   gtk_widget_show_all(head);
   dt_gui_box_add(box, head);
+  GtkWidget *target = box;
+  GtkWidget *detail_box = NULL;
   for(int i = 0; i < _N_ADJUSTS; i++)
   {
     const _masks_adjust_t *a = &_masks_adjusts[i];
+    if(i == 0 || i == _ADJ_COLOR_FIRST)
+    {
+      GtkWidget *g = gtk_label_new(i == 0 ? _("light") : _("color"));
+      gtk_label_set_xalign(GTK_LABEL(g), 0.0);
+      dt_gui_add_class(g, "dt_masks_adjust_group");
+      gtk_widget_show(g);
+      dt_gui_box_add(box, g);
+    }
+    else if(i == _ADJ_DETAIL_FIRST)
+    {
+      // texture, clarity and sharpness stay folded: most masks need only light and color
+      GtkWidget *ex = gtk_expander_new(_("detail"));
+      dt_gui_add_class(ex, "dt_masks_adjust_group");
+      detail_box = dt_gui_vbox();
+      gtk_container_add(GTK_CONTAINER(ex), detail_box);
+      gtk_widget_show_all(ex);
+      dt_gui_box_add(box, ex);
+      target = detail_box;
+    }
     GtkWidget *w = dt_bauhaus_slider_new_with_range(module, a->min, a->max, 0.0f, 0.0f, a->digits);
     dt_bauhaus_widget_set_label(w, N_("adjust mask"), a->label);
     if(a->unit[0]) dt_bauhaus_slider_set_format(w, a->unit);
@@ -1835,7 +1859,7 @@ static GtkWidget *_masks_adjust_box_new(dt_iop_module_t *module)
     g_object_set_data(G_OBJECT(w), "dt-adjust-index", GINT_TO_POINTER(i));
     g_signal_connect(G_OBJECT(w), "value-changed", G_CALLBACK(_masks_adjust_changed), module);
     bd->masks_adjust_sliders[i] = w;
-    dt_gui_box_add(box, w);
+    dt_gui_box_add(target, w);
     gtk_widget_show(w);
   }
   gtk_widget_show(label);

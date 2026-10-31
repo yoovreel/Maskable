@@ -48,12 +48,12 @@ typedef struct dt_lib_mask_adjust_t
 
 const char *name(dt_lib_module_t *self)
 {
-  return _("mask adjustment");
+  return _("adjust mask");
 }
 
 const char *description(dt_lib_module_t *self)
 {
-  return _("quick sliders for the selected mask.\n"
+  return _("light, color and detail sliders for the selected mask.\n"
            "moving one adds the module instance for it, named after the mask");
 }
 
@@ -64,13 +64,14 @@ dt_view_type_flags_t views(dt_lib_module_t *self)
 
 uint32_t container(dt_lib_module_t *self)
 {
-  return DT_UI_CONTAINER_PANEL_RIGHT_TOP;
+  return DT_UI_CONTAINER_PANEL_LEFT_CENTER;
 }
 
 int position(const dt_lib_module_t *self)
 {
-  // just under the module groups (999)
-  return 998;
+  // right under the masks list (880), in the left panel: it scrolls with
+  // the panel and is not pinned above the modules
+  return 870;
 }
 
 static void _give_back(dt_lib_mask_adjust_t *d)
@@ -173,13 +174,17 @@ void gui_init(dt_lib_module_t *self)
 
   self->widget = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   d->holder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  d->empty = gtk_label_new(_("select a mask in the masks list to adjust it here"));
+  d->empty = gtk_label_new(_("select a mask above to adjust it here"));
   gtk_label_set_xalign(GTK_LABEL(d->empty), 0.0);
   gtk_label_set_line_wrap(GTK_LABEL(d->empty), TRUE);
   dt_gui_add_class(d->empty, "dt_presets_empty");
   gtk_box_pack_start(GTK_BOX(self->widget), d->holder, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(self->widget), d->empty, FALSE, FALSE, 0);
   gtk_widget_show_all(self->widget);
+
+  // open from the first start: this panel is the point of selecting a mask
+  if(!dt_conf_key_exists("plugins/darkroom/mask_adjust/expanded"))
+    dt_conf_set_bool("plugins/darkroom/mask_adjust/expanded", TRUE);
 
   DT_CONTROL_SIGNAL_HANDLE(DT_SIGNAL_DEVELOP_HISTORY_CHANGE, _history_changed);
   d->poll = g_timeout_add(300, _poll, self);

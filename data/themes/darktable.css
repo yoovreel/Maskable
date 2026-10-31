@@ -4549,6 +4549,14 @@ popover.menu button.dt_masks_preset_delete
 }
 
 /* "adjust" sliders on a mask (develop/blend_gui.c) */
+.dt_masks_adjust_group
+{
+  color: @section_label;
+  margin: 0.56em 0 0.14em 0;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
 .dt_masks_adjust_title
 {
   color: @section_label;
