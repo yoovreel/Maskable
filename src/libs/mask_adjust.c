@@ -69,9 +69,9 @@ uint32_t container(dt_lib_module_t *self)
 
 int position(const dt_lib_module_t *self)
 {
-  // right under the masks list (880), in the left panel: it scrolls with
-  // the panel and is not pinned above the modules
-  return 870;
+  // in the left panel, above the masks list (880): adding an adjustment to a
+  // mask grows the list below, and the sliders must stay where the pointer is
+  return 890;
 }
 
 static void _give_back(dt_lib_mask_adjust_t *d)
@@ -174,7 +174,7 @@ void gui_init(dt_lib_module_t *self)
 
   self->widget = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   d->holder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  d->empty = gtk_label_new(_("select a mask above to adjust it here"));
+  d->empty = gtk_label_new(_("select a mask below to adjust it here"));
   gtk_label_set_xalign(GTK_LABEL(d->empty), 0.0);
   gtk_label_set_line_wrap(GTK_LABEL(d->empty), TRUE);
   dt_gui_add_class(d->empty, "dt_presets_empty");

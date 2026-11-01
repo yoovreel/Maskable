@@ -87,7 +87,7 @@ static void _row_clicked(GtkButton *button, dt_lib_module_t *self)
   dt_develop_t *dev = darktable.develop;
   if(!m || !dev || !g_list_find(dev->iop, m)) return;
   dt_dev_modulegroups_switch(dev, m);
-  dt_iop_request_focus(m);
+  if(dt_dev_gui_module() != m) dt_iop_request_focus(m);
   dt_iop_gui_set_expanded(m, TRUE, TRUE);
   dt_iop_gui_blend_masks_panel_open();
   dt_iop_gui_scroll_into_view_later(m->expander);
@@ -301,32 +301,34 @@ static void _rename_clicked(GtkWidget *button, dt_lib_module_t *self)
   gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dlg))), entry, TRUE, TRUE, 6);
   gtk_widget_show_all(dlg);
 
-  if(gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT)
+  while(gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_ACCEPT)
   {
     gchar *name = g_strstrip(g_strdup(gtk_entry_get_text(GTK_ENTRY(entry))));
     if(!name[0] || !g_strcmp0(name, key))
     {
-      // nothing to change
+      g_free(name);
+      break; // nothing to change
     }
-    else
+    // two masks may not share a name: the name is what ties a mask to its adjustments
+    gboolean taken = FALSE;
+    for(const GList *l = dev->iop; l && !taken; l = g_list_next(l))
     {
-      // two masks may not share a name: the name is what ties a mask to its adjustments
-      gboolean taken = FALSE;
-      for(const GList *l = dev->iop; l && !taken; l = g_list_next(l))
-      {
-        const dt_iop_module_t *o = l->data;
-        if(g_list_find(members, o)) continue;
-        gchar *k = _mask_key(o);
-        taken = !g_strcmp0(k, name);
-        g_free(k);
-      }
-      if(taken)
-        dt_control_log(_("another mask already has that name"));
-      else
-        for(GList *l = members; l; l = g_list_next(l))
-          dt_iop_update_multi_name((dt_iop_module_t *)l->data, name, TRUE, TRUE, TRUE);
+      const dt_iop_module_t *o = l->data;
+      if(g_list_find(members, o)) continue;
+      gchar *k = _mask_key(o);
+      taken = !g_strcmp0(k, name);
+      g_free(k);
     }
+    if(taken)
+    {
+      dt_control_log(_("another mask already has that name"));
+      g_free(name);
+      continue; // keep the dialog open for another name
+    }
+    for(GList *l = members; l; l = g_list_next(l))
+      dt_iop_update_multi_name((dt_iop_module_t *)l->data, name, TRUE, TRUE, TRUE);
     g_free(name);
+    break;
   }
   gtk_widget_destroy(dlg);
   g_free(key);
@@ -340,6 +342,16 @@ static gboolean _title_pressed(GtkWidget *w, GdkEventButton *e, dt_lib_module_t 
   return TRUE;
 }
 
+static gint _mask_name_cmp(gconstpointer a, gconstpointer b)
+{
+  gchar *ka = _mask_key(a), *kb = _mask_key(b);
+  gchar *ca = g_utf8_collate_key_for_filename(ka ? ka : ((dt_iop_module_t *)a)->name(), -1);
+  gchar *cb = g_utf8_collate_key_for_filename(kb ? kb : ((dt_iop_module_t *)b)->name(), -1);
+  const gint r = g_strcmp0(ca, cb);
+  g_free(ca); g_free(cb); g_free(ka); g_free(kb);
+  return r;
+}
+
 static void _fill(dt_lib_module_t *self)
 {
   dt_lib_mask_layers_t *d = self->data;
@@ -349,11 +361,24 @@ static void _fill(dt_lib_module_t *self)
   const dt_iop_module_t *focus = dt_dev_gui_module();
   GList *done = NULL; // the modules already shown as part of a mask
 
-  // top of the pipe first, as layers are listed
+  // one entry per mask, in the order of their names: adding an adjustment to
+  // a mask moves its modules in the pipe, and the list must not move with them
+  GList *firsts = NULL, *seen = NULL;
   for(const GList *l = dev ? g_list_last(dev->iop) : NULL; l; l = g_list_previous(l))
   {
     dt_iop_module_t *m = l->data;
     if(!m->expander || !_has_mask(m) || dt_iop_is_hidden(m)) continue;
+    if(g_list_find(seen, m)) continue;
+    GList *mem = _mask_members(m);
+    seen = g_list_concat(seen, mem);
+    firsts = g_list_append(firsts, m);
+  }
+  g_list_free(seen);
+  firsts = g_list_sort(firsts, _mask_name_cmp);
+
+  for(const GList *l = firsts; l; l = g_list_next(l))
+  {
+    dt_iop_module_t *m = l->data;
     if(g_list_find(done, m)) continue;
 
     GList *members = _mask_members(m);
@@ -461,6 +486,7 @@ static void _fill(dt_lib_module_t *self)
     n++;
   }
   g_list_free(done);
+  g_list_free(firsts);
 
   gtk_widget_set_visible(d->empty, n == 0);
   gtk_widget_show_all(d->list);
