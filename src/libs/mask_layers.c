@@ -86,8 +86,11 @@ static void _row_clicked(GtkButton *button, dt_lib_module_t *self)
   dt_iop_module_t *m = g_object_get_data(G_OBJECT(button), "module");
   dt_develop_t *dev = darktable.develop;
   if(!m || !dev || !g_list_find(dev->iop, m)) return;
+  // a second click on the selected mask changes nothing: it must not
+  // deselect it, or double-clicking its name to rename it would
+  if(dt_dev_gui_module() == m) return;
   dt_dev_modulegroups_switch(dev, m);
-  if(dt_dev_gui_module() != m) dt_iop_request_focus(m);
+  dt_iop_request_focus(m);
   dt_iop_gui_set_expanded(m, TRUE, TRUE);
   dt_iop_gui_blend_masks_panel_open();
   dt_iop_gui_scroll_into_view_later(m->expander);
